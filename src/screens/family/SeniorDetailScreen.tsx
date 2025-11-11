@@ -26,7 +26,12 @@ type RootStackParamList = {
   SeniorDetail: { seniorId: string };
   TrackSenior: { seniorId: string };
   HealthHistory: { seniorId: string };
-  Messages: { seniorId: string };
+  Messages: { 
+    seniorId: string;
+    seniorName?: string;
+    seniorAvatar?: string;
+    status?: 'online' | 'offline' | 'alert';
+  };
 };
 
 type SeniorDetailRouteProp = RouteProp<RootStackParamList, 'SeniorDetail'>;
@@ -198,7 +203,12 @@ const SeniorDetailScreen = () => {
 
   const handleMessage = () => {
     if (!senior) return;
-    navigation.navigate('Messages', { seniorId: senior.id });
+    navigation.navigate('Messages', { 
+      seniorId: senior.id,
+      seniorName: senior.name,
+      seniorAvatar: senior.avatar,
+      status: senior.status
+    });
   };
 
   const handleLocation = () => {

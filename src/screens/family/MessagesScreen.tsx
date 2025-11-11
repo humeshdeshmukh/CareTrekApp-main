@@ -33,7 +33,12 @@ type RootStackParamList = {
     seniorAvatar?: string;
     status?: 'online' | 'offline' | 'alert';
   };
-  SeniorDetail: { seniorId: string };
+  SeniorDetail: { 
+    seniorId: string;
+    seniorName?: string;
+    seniorAvatar?: string;
+    status?: 'online' | 'offline' | 'alert';
+  };
 };
 
 type Message = {
@@ -114,13 +119,25 @@ const MessagesScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [senior, setSenior] = useState<Senior | null>(() => ({
-    id: route.params.seniorId,
-    name: route.params.seniorName || t('Senior'),
-    avatar: route.params.seniorAvatar,
-    status: route.params.status || 'offline',
-    lastSeen: new Date(),
-  }));
+  const [senior, setSenior] = useState<Senior | null>(() => {
+    if (!route.params?.seniorId) {
+      console.error('No seniorId provided to MessagesScreen');
+      // Return a default senior object or handle the error appropriately
+      return {
+        id: 'unknown',
+        name: t('Senior') || 'Senior',
+        status: 'offline',
+        lastSeen: new Date(),
+      };
+    }
+    return {
+      id: route.params.seniorId,
+      name: route.params.seniorName || t('Senior') || 'Senior',
+      avatar: route.params.seniorAvatar,
+      status: route.params.status || 'offline',
+      lastSeen: new Date(),
+    };
+  });
 
   // i18n fallbacks
   const strings = {

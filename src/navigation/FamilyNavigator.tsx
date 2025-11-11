@@ -51,10 +51,20 @@ type FamilyStackParamList = {
   // Main Screens
   Home: undefined;
   Seniors: { refresh?: boolean };
-  SeniorDetail: { seniorId: string };
+  SeniorDetail: { 
+    seniorId: string; 
+    seniorName?: string; 
+    seniorAvatar?: string; 
+    status?: 'online' | 'offline' | 'alert' 
+  };
   ConnectSenior: undefined;
   Alerts: undefined;
-  Messages: { recipientId?: string };
+  Messages: { 
+    seniorId: string; 
+    seniorName?: string; 
+    seniorAvatar?: string; 
+    status?: 'online' | 'offline' | 'alert' 
+  };
   Settings: undefined;
   
   // Family Key Management
@@ -66,6 +76,9 @@ type FamilyStackParamList = {
   NewConnectSenior: undefined;
   FamilySettings: undefined;
   HealthHistory: { seniorId: string };
+  
+  // Auth
+  Logout: undefined;
 };
 
 const Tab = createBottomTabNavigator<FamilyTabParamList>();
@@ -254,6 +267,14 @@ export const FamilyNavigator = () => {
           title: t('Settings') || 'Settings',
           headerShown: true,
         }} 
+      />
+      <Stack.Screen 
+        name="Messages" 
+        component={MessagesScreen} 
+        options={({ route }) => ({ 
+          title: route.params?.seniorName || t('Messages') || 'Messages',
+          headerShown: true,
+        })} 
       />
     </Stack.Navigator>
   );

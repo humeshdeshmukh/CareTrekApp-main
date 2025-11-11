@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -8,7 +8,8 @@ import {
   TouchableOpacity, 
   SafeAreaView,
   Alert,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -18,6 +19,7 @@ import * as Linking from 'expo-linking';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
+import { useAuth } from '../../contexts/auth/AuthContext';
 
 type SettingsStackParamList = {
   EditProfile: undefined;
@@ -26,17 +28,27 @@ type SettingsStackParamList = {
   TermsOfService: undefined;
   HelpCenter: undefined;
   ContactSupport: undefined;
+  // Add Auth stack for logout
+  Auth: undefined;
 };
 
 const FamilySettingsScreen = () => {
   const navigation = useNavigation<StackNavigationProp<SettingsStackParamList>>();
-  const { isDark, toggleTheme } = useTheme();
-  const { currentLanguage, changeLanguage } = useTranslation();
+  const { isDark, toggleTheme, colors } = useTheme();
+  const { currentLanguage } = useTranslation();
+  const { user: authUser, signOut } = useAuth();
   
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationSharingEnabled, setLocationSharingEnabled] = useState(true);
   const [emergencyAlertsEnabled, setEmergencyAlertsEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(isDark);
+  
+  // Get user data from auth context with fallbacks
+  const user = {
+    name: authUser?.displayName || authUser?.email?.split('@')[0] || 'User',
+    email: authUser?.email || 'No email available',
+    avatar: authUser?.photoURL || undefined,
+  };
 
   // Translations
   const { translatedText: settingsText } = useCachedTranslation('Settings', currentLanguage);
@@ -60,7 +72,7 @@ const FamilySettingsScreen = () => {
   const { translatedText: cancelText } = useCachedTranslation('Cancel', currentLanguage);
   const { translatedText: confirmText } = useCachedTranslation('Confirm', currentLanguage);
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     Alert.alert(
       signOutText,
       signOutConfirmationText,
@@ -71,9 +83,18 @@ const FamilySettingsScreen = () => {
         },
         {
           text: confirmText,
-          onPress: () => {
-            // Handle sign out logic here
-            console.log('User signed out');
+          onPress: async () => {
+            try {
+              await signOut();
+              // Navigate to auth stack after successful sign out
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Auth' }],
+              });
+            } catch (error) {
+              console.error('Error signing out:', error);
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
+            }
           },
           style: 'destructive',
         },
@@ -163,15 +184,72 @@ const FamilySettingsScreen = () => {
     </TouchableOpacity>
   );
 
+  // Get user initials for avatar fallback
+  const getUserInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase();
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#171923' : '#F7FAFC' }]}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-          {settingsText}
-        </Text>
-      </View>
-      
-      <ScrollView style={styles.scrollView}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#1A202C' : '#F7FAFC' }]}>
+      <ScrollView contentContainerStyle={styles.scrollView}>
+        {/* Profile Header */}
+        <View style={[styles.profileHeader, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
+          <View style={styles.avatarContainer}>
+            {user.avatar ? (
+              <Image 
+                source={{ uri: user.avatar }} 
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
+                <Text style={styles.avatarText}>{getUserInitials(user.name)}</Text>
+              </View>
+            )}
+          </View>
+          <Text 
+            style={[styles.userName, { 
+              color: isDark ? '#FFFFFF' : '#1A202C',
+              maxWidth: '100%',
+              paddingHorizontal: 20,
+              textAlign: 'center'
+            }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {user.name}
+          </Text>
+          <Text 
+            style={[styles.userEmail, { 
+              color: isDark ? '#A0AEC0' : '#718096',
+              maxWidth: '100%',
+              paddingHorizontal: 20,
+              textAlign: 'center'
+            }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {user.email}
+          </Text>
+          <TouchableOpacity 
+            style={[styles.editButton, { borderColor: colors.primary }]}
+            onPress={() => navigation.navigate('EditProfile')}
+          >
+            <Text style={[styles.editButtonText, { color: colors.primary }]}>
+              {editProfileText || 'Edit Profile'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.header, { backgroundColor: isDark ? '#1A202C' : '#F7FAFC' }]}>
+          <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#1A202C' }]}>
+            {settingsText || 'Settings'}
+          </Text>
+        </View>
         {/* Account Section */}
         {renderSectionHeader(accountText)}
         <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1A202C' : '#FFFFFF' }]}>
@@ -263,10 +341,30 @@ const FamilySettingsScreen = () => {
 
         {/* Sign Out Button */}
         <TouchableOpacity 
-          style={[styles.signOutButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
+          style={[styles.signOutButton, { 
+            backgroundColor: isDark ? '#2D3748' : '#FFFFFF',
+            borderTopWidth: 1,
+            borderTopColor: isDark ? '#4A5568' : '#E2E8F0',
+            marginTop: 20,
+          }]}
           onPress={handleSignOut}
         >
-          <Text style={[styles.signOutText, { color: '#E53E3E' }]}>{signOutText}</Text>
+          <View style={styles.signOutContent}>
+            <MaterialIcons 
+              name="logout" 
+              size={24} 
+              color="#E53E3E" 
+              style={styles.signOutIcon} 
+            />
+            <Text style={[styles.signOutText, { color: '#E53E3E' }]}>
+              {signOutText || 'Sign Out'}
+            </Text>
+          </View>
+          <MaterialIcons 
+            name="chevron-right" 
+            size={24} 
+            color="#A0AEC0" 
+          />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -278,19 +376,73 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7FAFC',
   },
+  // Profile Header Styles
+  profileHeader: {
+    padding: 24,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  avatarContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(79, 70, 229, 0.1)', // Primary color with 10% opacity
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#4F46E5', // Default primary color
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  userName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  userEmail: {
+    fontSize: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  editButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   header: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A202C',
+    fontSize: 18,
+    fontWeight: '600',
   },
   scrollView: {
-    flex: 1,
-    padding: 16,
+    paddingBottom: 20,
   },
   sectionHeader: {
     fontSize: 12,
@@ -334,6 +486,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1A202C',
     flex: 1,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderRadius: 0,
+    marginHorizontal: 0,
+    marginBottom: 0,
+  },
+  signOutContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  signOutIcon: {
+    marginRight: 12,
+  },
+  signOutText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   versionContainer: {
     padding: 16,
