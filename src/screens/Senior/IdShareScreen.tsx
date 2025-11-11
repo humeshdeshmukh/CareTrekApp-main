@@ -1,112 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
-  Alert,
   ScrollView,
+  Alert,
   ActivityIndicator,
   Share,
   Platform,
-  KeyboardAvoidingView,
   SafeAreaView,
+  useWindowDimensions
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useTranslation } from '../../contexts/translation/TranslationContext';
-import { getOrCreateSeniorId, getFamilyMembers, addFamilyMember, removeFamilyMember } from '../../utils/idManager';
-
-type IdShareScreenNavigationProp = StackNavigationProp<RootStackParamList, 'IdShare'>;
-
-interface FamilyMember {
-  id: string;
-  name: string;
-  email: string;
-  photoURL?: string;
-  role?: string;
-}
+import { useAuth } from '../../contexts/AuthContext';
 
 const IdShareScreen = () => {
-  const { colors, isDark } = useTheme();
-  const { t } = useTranslation();
-  const navigation = useNavigation<IdShareScreenNavigationProp>();
-  const [isLoading, setIsLoading] = useState(true);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [email, setEmail] = useState('');
-  const [seniorId, setSeniorId] = useState('');
+  const { colors } = useTheme();
+  const { user } = useAuth();
+  const navigation = useNavigation();
+  
+  const seniorId = user?.uid || 'Not Available';
   const [copied, setCopied] = useState(false);
-  const [name, setName] = useState('');
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [id, members] = await Promise.all([
-          getOrCreateSeniorId(),
-          getFamilyMembers()
-        ]);
-        setSeniorId(id);
-        setFamilyMembers(members);
-      } catch (error) {
-        console.error('Error loading data:', error);
-        Alert.alert('Error', 'Failed to load data');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
-
-  const handleAddFamilyMember = async () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter an email address');
-      return;
-    }
-
-    // Simple email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const name = email.split('@')[0];
-      const success = await addFamilyMember(email, name);
-      
-      if (success) {
-        const updatedMembers = await getFamilyMembers();
-        setFamilyMembers(updatedMembers);
-        setEmail('');
-        Alert.alert('Success', 'Family member added successfully');
-      } else {
-        Alert.alert('Error', 'This email is already added');
-      }
-    } catch (error) {
-      console.error('Error adding family member:', error);
-      Alert.alert('Error', 'Failed to add family member');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRemoveMember = async (id: string) => {
-    try {
-      await removeFamilyMember(id);
-      const updatedMembers = await getFamilyMembers();
-      setFamilyMembers(updatedMembers);
-    } catch (error) {
-      console.error('Error removing family member:', error);
-      Alert.alert('Error', 'Failed to remove family member');
-    }
-  };
+  const [isLoading, setIsLoading] = useState(false);
 
   const copyToClipboard = async () => {
     try {
@@ -119,19 +38,21 @@ const IdShareScreen = () => {
     }
   };
 
-  const shareViaEmail = async () => {
+  const shareId = async () => {
     try {
-      const message = `I'd like to share my CareTrek Senior ID with you. My ID is: ${seniorId}\n\nPlease use this ID to connect with me in the CareTrek app.`;
+      const message = `My CareTrek Senior ID is: ${seniorId}\n\nUse this ID to connect with me in the CareTrek app.`;
       const shareOptions = {
         message,
-        title: 'Share Senior ID',
+        title: 'My CareTrek Senior ID',
         ...(Platform.OS === 'android' && { subject: 'CareTrek Senior ID' }),
       };
       await Share.share(shareOptions);
     } catch (error) {
+      console.error('Error sharing ID:', error);
       Alert.alert('Error', 'Failed to share ID. Please try again.');
     }
   };
+
 
   if (isLoading) {
     return (
@@ -143,307 +64,182 @@ const IdShareScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 16 : 0}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Share ID
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Share Your ID
           </Text>
-        </View> */}
+          <View style={styles.headerRight} />
+        </View>
 
-        <ScrollView 
-          style={styles.content}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Your Senior ID
+        {/* ID Card */}
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.primary, marginBottom: 32 }]}>
+            Your Senior ID
+          </Text>
+          
+          <View style={styles.idContainer}>
+            <Text 
+              style={[styles.idText, { color: colors.text }]}
+              selectable
+              selectionColor={colors.primary + '40'}
+            >
+              {seniorId}
             </Text>
-            <View style={[styles.idContainer, { backgroundColor: colors.background + '40' }]}>
-              <Text 
-                style={[styles.seniorId, { 
-                  color: colors.text,
-                  backgroundColor: colors.background + '80',
-                  padding: 10,
-                  borderRadius: 6,
-                  fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-                  letterSpacing: 0.5,
-                }]}
-                selectable
-              >
-                {seniorId || 'Generating ID...'}
-              </Text>
-              <TouchableOpacity 
-                onPress={copyToClipboard} 
-                style={[styles.copyButton, { 
-                  backgroundColor: copied ? colors.success + '20' : colors.primary + '20' 
-                }]}
-                accessibilityLabel="Copy ID to clipboard"
-              >
-                <MaterialCommunityIcons
-                  name={copied ? 'check' : 'content-copy'}
-                  size={20}
-                  color={copied ? colors.success : colors.primary}
-                />
-              </TouchableOpacity>
-              {copied && (
-                <Text style={[styles.copiedText, { color: colors.success }]}>
-                  Copied!
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                onPress={shareViaEmail}
-                accessibilityLabel="Share ID"
-              >
-                <Ionicons name="share-social" size={18} color="#FFFFFF" />
-                <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
-                  Share
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-              Share this ID with family members to connect with you
-            </Text>
-          </View>
-
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Add Family Member
-            </Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[
-                  styles.input,
-                  { 
-                    backgroundColor: colors.inputBackground,
-                    color: colors.text,
-                    borderColor: colors.border
-                  },
-                ]}
-                placeholder="Enter email address"
-                placeholderTextColor={colors.placeholder}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleAddFamilyMember}
+            
+            <TouchableOpacity 
+              onPress={copyToClipboard}
+              style={[styles.copyButton, { 
+                backgroundColor: copied 
+                  ? (colors.success || '#10B981') + '20' 
+                  : colors.primary + '15'
+              }]}
+            >
+              <MaterialCommunityIcons
+                name={copied ? 'check' : 'content-copy'}
+                size={20}
+                color={copied ? (colors.success || '#10B981') : colors.primary}
               />
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={handleAddFamilyMember}
-                disabled={isLoading || !email.trim()}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="add" size={24} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
-
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Family Members
+          
+          {copied && (
+            <Text style={[styles.copiedText, { color: colors.success || '#10B981' }]}>
+              Copied to clipboard!
             </Text>
-            {familyMembers.length === 0 ? (
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                No family members added yet
-              </Text>
-            ) : (
-              familyMembers.map((member) => (
-                <View 
-                  key={member.id} 
-                  style={[styles.memberItem, { borderBottomColor: colors.border }]}
-                >
-                  <View style={styles.memberInfo}>
-                    <Text style={[styles.memberName, { color: colors.text }]}>
-                      {member.name}
-                    </Text>
-                    <Text style={[styles.memberEmail, { color: colors.textSecondary }]}>
-                      {member.email}
-                    </Text>
-                  </View>
-                  <TouchableOpacity 
-                    onPress={() => handleRemoveMember(member.id)}
-                    style={styles.removeButton}
-                    accessibilityLabel={`Remove ${member.name}`}
-                  >
-                    <MaterialCommunityIcons
-                      name="account-remove"
-                      size={24}
-                      color={colors.error || '#E53E3E'}
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
+          )}
+          
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.shareButton, { backgroundColor: colors.primary }]}
+              onPress={shareId}
+            >
+              <Ionicons name="share-social" size={20} color="#FFFFFF" />
+              <Text style={styles.shareButtonText}>Share ID</Text>
+            </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+        
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  container: {
-    flex: 1,
-  },
-  keyboardAvoidingView: {
+  scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    padding: 16,
+    paddingBottom: 32,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    justifyContent: 'space-between',
+    marginBottom: 24,
   },
   backButton: {
     padding: 8,
     marginLeft: -8,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    textAlign: 'center',
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
     flex: 1,
-    marginHorizontal: 16,
+    textAlign: 'center',
+    marginLeft: -32, // To center the title
   },
   headerRight: {
     width: 40,
   },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
   card: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 24,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 2,
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 24,
+    textAlign: 'center',
   },
   idContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    width: '100%',
+    justifyContent: 'center',
   },
-  seniorId: {
+  idText: {
     fontSize: 18,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '600',
     marginRight: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
     flex: 1,
+    textAlign: 'center',
   },
   copyButton: {
-    marginLeft: 12,
-    padding: 8,
-    borderRadius: 6,
-    width: 36,
-    height: 36,
+    padding: 12,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   copiedText: {
-    position: 'absolute',
-    right: 60,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    marginTop: 12,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    flex: 1,
-  },
-  actionButtonText: {
-    marginLeft: 8,
-    fontWeight: '600',
-    fontSize: 16,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   helperText: {
     fontSize: 14,
-    marginTop: 8,
-    opacity: 0.8,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  input: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    borderWidth: 1,
-    fontSize: 16,
-  },
-  addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
     textAlign: 'center',
-    marginVertical: 16,
-    fontSize: 16,
+    marginBottom: 24,
+    lineHeight: 20,
   },
-  memberItem: {
+  shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    width: '100%',
   },
-  memberInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  memberName: {
+  shareButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  memberEmail: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  removeButton: {
-    padding: 8,
+    fontWeight: '600',
     marginLeft: 8,
+  },
+  buttonContainer: {
+    width: '100%',
+    marginTop: 24,
   },
 });
 
