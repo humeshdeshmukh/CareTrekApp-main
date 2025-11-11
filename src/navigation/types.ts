@@ -22,6 +22,7 @@ export type AuthStackParamList = {
     isSignUp?: boolean;
   };
   Emergency: { role: UserRole };
+  EditProfile: undefined;
 };
 
 export type FamilyStackParamList = {

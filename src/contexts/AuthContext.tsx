@@ -8,7 +8,7 @@ type UserRole = 'family' | 'senior' | null;
 
 type User = {
   id: string;
-  uid: string; // Add uid to match Firebase's user.uid
+  uid?: string; // Make uid optional for backward compatibility
   email: string | null;
   displayName: string | null;
   emailVerified: boolean;
@@ -200,8 +200,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       
-      // Call the API to delete the user account
-      const { error } = await deleteUserAccount();
+      if (!user) throw new Error('No user is signed in');
+      
+      // Call the Supabase function to delete the user
+      const { error } = await supabase.functions.invoke('delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
       if (error) {
         console.error('Error deleting account:', error);
@@ -245,25 +252,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateProfile = async (updates: { displayName?: string; photoURL?: string | null }): Promise<void> => {
+  const updateProfile = async (updates: { 
+    displayName?: string; 
+    photoURL?: string | null;
+    email?: string | null;
+    phoneNumber?: string | null;
+  }) => {
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          full_name: updates.displayName,
-          avatar_url: updates.photoURL,
-        },
+      if (!user) throw new Error('No user is signed in');
+      
+      // Prepare update data
+      const updateData: any = {};
+      
+      // Only include displayName and photoURL in the data object (Supabase auth metadata)
+      if (updates.displayName !== undefined) {
+        updateData.displayName = updates.displayName;
+      }
+      if (updates.photoURL !== undefined) {
+        updateData.photoURL = updates.photoURL;
+      }
+      
+      // Update email if provided
+      if (updates.email) {
+        const { error: emailError } = await supabase.auth.updateUser({
+          email: updates.email
+        });
+        if (emailError) throw emailError;
+      }
+      
+      // Update user metadata
+      if (Object.keys(updateData).length > 0) {
+        const { error: updateError } = await supabase.auth.updateUser({
+          data: updateData
+        });
+        if (updateError) throw updateError;
+      }
+      
+      // Update local state
+      setUser({
+        ...user,
+        displayName: updates.displayName || user.displayName,
+        email: updates.email || user.email,
+        phoneNumber: updates.phoneNumber || user.phoneNumber,
+        ...updateData
       });
       
-      if (error) throw error;
-
-      setUser(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          displayName: updates.displayName !== undefined ? updates.displayName : prev.displayName,
-          photoURL: updates.photoURL !== undefined ? updates.photoURL : prev.photoURL,
-        };
-      });
+      // Here you might want to update the user's profile in your database as well
+      // For example:
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          display_name: updates.displayName,
+          phone_number: updates.phoneNumber,
+          updated_at: new Date().toISOString(),
+        });
+      
+      if (profileError) {
+        console.error('Error updating profile in database:', profileError);
+        // Don't throw here as the auth update was successful
+      }
+      
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;

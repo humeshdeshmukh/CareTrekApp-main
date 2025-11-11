@@ -11,6 +11,7 @@ import SignInScreen from '../screens/auth/SignInScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
+import EditProfileScreen from '../screens/Senior/EditProfileScreen';
 // import EmergencyScreen from '../screens/Senior/EmergencyScreen';
 
 const Stack = createStackNavigator<AuthStackParamList>();
@@ -95,10 +96,13 @@ export const AuthNavigator = () => {
       <Stack.Screen 
         name="OTPVerification" 
         component={OTPVerificationScreen}
-        options={{ 
-          title: 'Verify Phone',
-          headerBackTitle: 'Back',
-        }}
+        options={{ title: 'Verify OTP' }}
+      />
+
+      <Stack.Screen 
+        name="EditProfile" 
+        component={EditProfileScreen}
+        options={{ title: 'Edit Profile' }}
       />
 
       {/* Emergency Screen - Accessible from senior auth

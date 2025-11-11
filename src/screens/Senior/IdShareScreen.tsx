@@ -40,6 +40,7 @@ const IdShareScreen = () => {
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [email, setEmail] = useState('');
   const [seniorId, setSeniorId] = useState('');
+  const [copied, setCopied] = useState(false);
   const [name, setName] = useState('');
 
   useEffect(() => {
@@ -110,7 +111,8 @@ const IdShareScreen = () => {
   const copyToClipboard = async () => {
     try {
       await Clipboard.setStringAsync(seniorId);
-      Alert.alert('Copied!', 'Senior ID has been copied to clipboard');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Error copying to clipboard:', error);
       Alert.alert('Error', 'Failed to copy ID to clipboard');
@@ -160,21 +162,38 @@ const IdShareScreen = () => {
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Your Senior ID
             </Text>
-            <View style={styles.idContainer}>
-              <Text style={[styles.seniorId, { color: colors.text }]}>
+            <View style={[styles.idContainer, { backgroundColor: colors.background + '40' }]}>
+              <Text 
+                style={[styles.seniorId, { 
+                  color: colors.text,
+                  backgroundColor: colors.background + '80',
+                  padding: 10,
+                  borderRadius: 6,
+                  fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+                  letterSpacing: 0.5,
+                }]}
+                selectable
+              >
                 {seniorId || 'Generating ID...'}
               </Text>
               <TouchableOpacity 
                 onPress={copyToClipboard} 
-                style={[styles.copyButton, { backgroundColor: colors.primary + '20' }]}
+                style={[styles.copyButton, { 
+                  backgroundColor: copied ? colors.success + '20' : colors.primary + '20' 
+                }]}
                 accessibilityLabel="Copy ID to clipboard"
               >
                 <MaterialCommunityIcons
-                  name="content-copy"
+                  name={copied ? 'check' : 'content-copy'}
                   size={20}
-                  color={colors.primary}
+                  color={copied ? colors.success : colors.primary}
                 />
               </TouchableOpacity>
+              {copied && (
+                <Text style={[styles.copiedText, { color: colors.success }]}>
+                  Copied!
+                </Text>
+              )}
             </View>
 
             <View style={styles.buttonRow}>
@@ -342,10 +361,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   copyButton: {
+    marginLeft: 12,
     padding: 8,
-    borderRadius: 8,
+    borderRadius: 6,
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  copiedText: {
+    position: 'absolute',
+    right: 60,
+    fontSize: 12,
+    fontWeight: '500',
   },
   buttonRow: {
     flexDirection: 'row',
