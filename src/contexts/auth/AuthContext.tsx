@@ -1,318 +1,165 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Session, User } from '@supabase/supabase-js';
+import { useRouter } from 'expo-router';
+import { supabase } from '../../lib/supabase';
 
-// Mock user type for our simplified auth
-interface User {
-  uid: string;
-  email: string | null;
+// Define user roles
+export type UserRole = 'senior' | 'family' | 'guest';
+
+// Extend the User type from Supabase
+interface AppUser extends User {
+  role: UserRole;
   displayName: string | null;
+  phoneNumber: string | null;
   photoURL: string | null;
   isAnonymous: boolean;
 }
 
-// Mock UserCredential type
-interface UserCredential {
-  user: User;
-}
-
-// Mock ConfirmationResult type
-interface ConfirmationResult {
-  verificationId: string;
-  confirm: (verificationCode: string) => Promise<UserCredential>;
-}
-
-// Define the shape of our auth context
-export interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isGuest: boolean;
+// Auth context type
+interface AuthContextType {
+  user: AppUser | null;
+  session: Session | null;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<UserCredential>;
-  register: (email: string, password: string, displayName: string) => Promise<UserCredential>;
-  loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
-  verifyOtp: (verificationId: string, otp: string) => Promise<UserCredential>;
-  guestLogin: () => Promise<UserCredential>;
-  logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updateUserProfile: (updates: { displayName?: string; photoURL?: string }) => Promise<void>;
-  updateUserEmail: (newEmail: string, password: string) => Promise<void>;
-  updateUserPassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  deleteAccount: (password: string) => Promise<void>;
-  recaptchaVerifier: React.RefObject<{ verify: () => Promise<string> } | null>;
+  role: UserRole | null;
+  isAuthenticated: boolean;
+  isGuest: boolean;
+  signIn: (email: string, password: string) => Promise<{ user: AppUser | null; session: Session | null }>;
+  signUp: (email: string, password: string, displayName: string, role: UserRole) => Promise<{ user: AppUser | null; session: Session | null }>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  updateProfile: (updates: { displayName?: string; photoURL?: string }) => Promise<void>;
+  signInWithPhone: (phoneNumber: string) => Promise<{ error: Error | null }>;
+  verifyOtp: (phoneNumber: string, token: string) => Promise<{ session: Session | null; user: AppUser | null; error: Error | null }>;
+  guestSignIn: () => Promise<void>;
 }
 
+// Create the auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock implementation of AuthProvider
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const recaptchaVerifier = useRef<{ verify: () => Promise<string> } | null>(null);
+// Auth provider props
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-  const isAuthenticated = !!user;
-  const isGuest = user?.isAnonymous || false;
-
-  // Mock login function
-  const login = async (email: string, password: string): Promise<UserCredential> => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUser: User = {
-        uid: 'mock-user-123',
-        email,
-        displayName: email.split('@')[0],
-        photoURL: null,
-        isAnonymous: false
-      };
-      
-      setUser(mockUser);
-      return { user: mockUser };
-    } catch (err) {
-      setError('Failed to login');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Mock register function
-  const register = async (email: string, password: string, displayName: string): Promise<UserCredential> => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockUser: User = {
-        uid: `mock-user-${Date.now()}`,
-        email,
-        displayName,
-        photoURL: null,
-        isAnonymous: false
-      };
-      
-      setUser(mockUser);
-      return { user: mockUser };
-    } catch (err) {
-      setError('Failed to register');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Mock logout function
-  const logout = async (): Promise<void> => {
-    setUser(null);
-    return Promise.resolve();
-  };
-
-  // Mock guest login
-  const guestLogin = async (): Promise<UserCredential> => {
-    const mockUser: User = {
-      uid: `guest-${Date.now()}`,
-      email: null,
-      displayName: 'Guest',
-      photoURL: null,
-      isAnonymous: true
-    };
-    
-    setUser(mockUser);
-    return { user: mockUser };
-  };
-
-  // Mock phone login
-  const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
-    return {
-      verificationId: 'mock-verification-id',
-      confirm: async (verificationCode: string) => {
-        const mockUser: User = {
-          uid: `phone-user-${Date.now()}`,
-          email: null,
-          displayName: phoneNumber,
-          photoURL: null,
-          isAnonymous: false
-        };
-        
-        setUser(mockUser);
-        return { user: mockUser };
-      }
-    };
-  };
-
-  // Mock verify OTP
-  const verifyOtp = async (verificationId: string, otp: string): Promise<UserCredential> => {
-    const mockUser: User = {
-      uid: `phone-user-${Date.now()}`,
-      email: null,
-      displayName: 'Phone User',
-      photoURL: null,
-      isAnonymous: false
-    };
-    
-    setUser(mockUser);
-    return { user: mockUser };
-  };
-
-  // Mock update profile
-  const updateUserProfile = async (updates: { displayName?: string; photoURL?: string }): Promise<void> => {
-    if (user) {
-      setUser({
-        ...user,
-        displayName: updates.displayName || user.displayName,
-        photoURL: updates.photoURL || user.photoURL
-      });
-    }
-    return Promise.resolve();
-  };
-
-  // Mock update email
-  const updateUserEmail = async (newEmail: string, password: string): Promise<void> => {
-    if (user) {
-      setUser({
-        ...user,
-        email: newEmail
-      });
-    }
-    return Promise.resolve();
-  };
-
-  // Mock update password
-  const updateUserPassword = async (currentPassword: string, newPassword: string): Promise<void> => {
-    // In a real app, verify current password and update to new one
-    return Promise.resolve();
-  };
-
-  // Mock reset password
-  const resetPassword = async (email: string): Promise<void> => {
-    // In a real app, send password reset email
-    return Promise.resolve();
-  };
-
-  // Mock delete account
-  const deleteAccount = async (password: string): Promise<void> => {
-    setUser(null);
-    return Promise.resolve();
-  };
-
-  const value: AuthContextType = {
-    user,
-    isAuthenticated,
-    isGuest,
-    isLoading,
-    error,
-    login,
-    register,
-    loginWithPhone,
-    verifyOtp,
-    guestLogin,
-    logout,
-    resetPassword,
-    updateUserProfile,
-    updateUserEmail,
-    updateUserPassword,
-    deleteAccount,
-    recaptchaVerifier
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-// Custom hook to use the auth context
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export default AuthContext;
-    return `+91${cleaned.substring(1)}`;
-  }
-  // If the number starts with country code, add +
-  if (cleaned.length >= 10) {
-    return `+${cleaned}`;
-  }
-  // Default to Indian number if no country code
-  return `+91${cleaned}`;
-};
-
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
-  const recaptchaVerifier = useRef<RecaptchaVerifier | null>(null);
-  
-  // Set up auth state observer
+  const router = useRouter();
+
+  // Check for existing session on mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setIsAuthenticated(!!user);
-      setIsGuest(!!user?.isAnonymous);
-      setIsLoading(false);
+    // Check active sessions and set the user
+    const getInitialSession = async () => {
+      try {
+        setIsLoading(true);
+        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        if (currentSession?.user) {
+          const { data: userData, error: userError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentSession.user.id)
+            .single();
+
+          if (userError) throw userError;
+
+          setSession(currentSession);
+          setUser({
+            ...currentSession.user,
+            role: userData?.role || 'guest',
+            displayName: userData?.display_name || null,
+            phoneNumber: userData?.phone_number || null,
+            photoURL: userData?.avatar_url || null,
+            isAnonymous: false,
+          } as AppUser);
+        }
+      } catch (error) {
+        console.error('Error getting initial session:', error);
+        setError(error instanceof Error ? error.message : 'An error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    getInitialSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      if (currentSession?.user) {
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentSession.user.id)
+          .single();
+
+        if (!userError && userData) {
+          setSession(currentSession);
+          setUser({
+            ...currentSession.user,
+            role: userData.role || 'guest',
+            displayName: userData.display_name || null,
+            phoneNumber: userData.phone_number || null,
+            photoURL: userData.avatar_url || null,
+            isAnonymous: false,
+          } as AppUser);
+        }
+      } else {
+        setSession(null);
+        setUser(null);
+      }
     });
 
-    // Initialize reCAPTCHA verifier
-    if (typeof window !== 'undefined') {
-      recaptchaVerifier.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-      });
-    }
-
-    // Cleanup function
     return () => {
-      unsubscribe();
-      if (recaptchaVerifier.current) {
-        recaptchaVerifier.current.clear();
-      }
+      subscription.unsubscribe();
     };
   }, []);
 
-  // Resend OTP
-  const resendOtp = async (phoneNumber: string): Promise<ConfirmationResult> => {
-    return loginWithPhone(phoneNumber);
-  };
-
-  // Login with phone number (sends OTP)
-  const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
-    setIsLoading(true);
-    setError(null);
-    
+  // Sign in with email and password
+  const signIn = async (email: string, password: string) => {
     try {
-      const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
+      setIsLoading(true);
+      setError(null);
       
-      if (!recaptchaVerifier.current) {
-        throw new Error('reCAPTCHA verifier not initialized');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.session?.user) {
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (userError) throw userError;
+
+        const user = {
+          ...data.user,
+          role: userData.role,
+          displayName: userData.display_name,
+          phoneNumber: userData.phone_number,
+          photoURL: userData.avatar_url,
+          isAnonymous: false,
+        } as AppUser;
+
+        setUser(user);
+        setSession(data.session);
+        return { user, session: data.session };
       }
-      
-      const formattedPhone = formatPhoneNumber(phoneNumber);
-      const confirmationResult = await signInWithPhoneNumber(
-        auth,
-        formattedPhone,
-        recaptchaVerifier.current
-      );
-      
-      setConfirmation(confirmationResult);
-      return confirmationResult;
-      
-    } catch (error: any) {
-      console.error('Phone login error:', error);
-      let errorMessage = 'Failed to send verification code';
-      if (error.code === 'auth/invalid-phone-number') {
-        errorMessage = 'Invalid phone number format';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many attempts. Please try again later';
-      }
+
+      return { user: null, session: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -320,58 +167,250 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Email/Password Authentication
-  const login = async (email: string, password: string): Promise<UserCredential> => {
+  // Sign up with email and password
+  const signUp = async (email: string, password: string, displayName: string, role: UserRole) => {
     try {
       setIsLoading(true);
       setError(null);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      setIsGuest(false);
-      return userCredential;
-    } catch (error: any) {
-      let errorMessage = 'Failed to sign in';
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No user found with this email';
-          break;
-        case 'auth/wrong-password':
-          errorMessage = 'Incorrect password';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Too many failed attempts. Please try again later';
-          break;
+
+      // Create the user
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            display_name: displayName,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        // Create user profile in the database
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              email: data.user.email,
+              display_name: displayName,
+              role,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (profileError) throw profileError;
+
+        const user = {
+          ...data.user,
+          role,
+          displayName,
+          phoneNumber: null,
+          photoURL: null,
+          isAnonymous: false,
+        } as AppUser;
+
+        setUser(user);
+        return { user, session: data.session };
       }
+
+      return { user: null, session: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
       setError(errorMessage);
       throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Sign out
+  const signOut = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
+      setSession(null);
+      router.replace('/welcome');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Reset password
+  const resetPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reset password';
+      setError(errorMessage);
+      return { error: new Error(errorMessage) };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update user profile
+  const updateProfile = async (updates: { displayName?: string; photoURL?: string }) => {
+    if (!user) throw new Error('Not authenticated');
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const updatesToApply: {
+        display_name?: string;
+        avatar_url?: string;
+        updated_at: string;
+      } = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.displayName) updatesToApply.display_name = updates.displayName;
+      if (updates.photoURL) updatesToApply.avatar_url = updates.photoURL;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updatesToApply)
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Update local user state
+      setUser({
+        ...user,
+        displayName: updates.displayName || user.displayName,
+        photoURL: updates.photoURL || user.photoURL,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update profile';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Sign in with phone number (OTP)
+  const signInWithPhone = async (phoneNumber: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: phoneNumber,
+      });
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send OTP';
+      setError(errorMessage);
+      return { error: new Error(errorMessage) };
     } finally {
       setIsLoading(false);
     }
   };
 
   // Verify OTP
-  const verifyOtp = async (verificationId: string, otp: string): Promise<UserCredential> => {
+  const verifyOtp = async (phoneNumber: string, token: string) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      if (!confirmation) {
-        throw new Error('No confirmation found. Please request a new OTP.');
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: phoneNumber,
+        token,
+        type: 'sms',
+      });
+
+      if (error) throw error;
+
+      if (data.session?.user) {
+        // Check if user exists in profiles
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        // If no profile exists, create one
+        if (profileError || !profileData) {
+          const { error: createProfileError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: data.user.id,
+                phone_number: phoneNumber,
+                role: 'senior', // Default role for phone sign-in
+                created_at: new Date().toISOString(),
+              },
+            ]);
+
+          if (createProfileError) throw createProfileError;
+        }
+
+        const user = {
+          ...data.user,
+          role: profileData?.role || 'senior',
+          displayName: profileData?.display_name || null,
+          phoneNumber: phoneNumber,
+          photoURL: profileData?.avatar_url || null,
+          isAnonymous: false,
+        } as AppUser;
+
+        setUser(user);
+        setSession(data.session);
+        return { user, session: data.session, error: null };
       }
+
+      return { user: null, session: null, error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to verify OTP';
+      setError(errorMessage);
+      return { user: null, session: null, error: new Error(errorMessage) };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Guest sign in
+  const guestSignIn = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
       
-      const credential = PhoneAuthProvider.credential(verificationId, otp);
-      const userCredential = await signInWithCredential(auth, credential);
-      
-      setIsGuest(false);
-      return userCredential;
-      
-    } catch (error: any) {
-      console.error('OTP verification error:', error);
-      let errorMessage = 'Failed to verify OTP';
-      if (error.code === 'auth/invalid-verification-code') {
-        errorMessage = 'Invalid verification code';
-      } else if (error.code === 'auth/code-expired') {
-        errorMessage = 'Verification code has expired';
+      // Create an anonymous user
+      const { data, error } = await supabase.auth.signInAnonymously();
+
+      if (error) throw error;
+
+      if (data.user) {
+        const guestUser = {
+          ...data.user,
+          role: 'guest' as UserRole,
+          displayName: 'Guest User',
+          phoneNumber: null,
+          photoURL: null,
+          isAnonymous: true,
+        } as AppUser;
+
+        setUser(guestUser);
+        setSession(data.session);
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign in as guest';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -379,138 +418,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Register new user
-  const register = async (email: string, password: string, displayName: string): Promise<UserCredential> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Create user with email and password
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Update user profile with display name
-      if (userCredential.user) {
-        await updateProfile(userCredential.user, { displayName });
-        // Create user document in Firestore
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          uid: userCredential.user.uid,
-          email: userCredential.user.email,
-          displayName,
-          createdAt: new Date().toISOString(),
-          isGuest: false,
-          phoneNumber: userCredential.user.phoneNumber || null,
-          photoURL: userCredential.user.photoURL || null,
-          emailVerified: userCredential.user.emailVerified,
-        });
-        
-        // Update local user state
-        setUser({ ...userCredential.user, displayName } as User);
-      }
-      
-      setIsGuest(false);
-      return userCredential;
-      
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      let errorMessage = 'Failed to register';
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'Email is already in use';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Password should be at least 6 characters';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address';
-      }
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Logout
-  const logout = async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      await signOut(auth);
-      setUser(null);
-      setIsAuthenticated(false);
-      setIsGuest(false);
-      setConfirmation(null);
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      setError('Failed to logout. Please try again.');
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Guest login
-  const guestLogin = async (): Promise<UserCredential> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Sign in anonymously
-      const userCredential = await signInAnonymously(auth);
-      
-      // Create guest user document in Firestore
-      if (userCredential.user) {
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          uid: userCredential.user.uid,
-          isGuest: true,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
-        });
-      }
-      
-      setIsGuest(true);
-      return userCredential;
-      
-    } catch (error: any) {
-      console.error('Guest login error:', error);
-      setError('Failed to login as guest. Please try again.');
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const clearError = () => {
-    setError(null);
-  };
-
+  // Context value
   const value = {
     user,
-    isAuthenticated,
-    isGuest,
+    session,
     isLoading,
     error,
-    login,
-    register,
-    loginWithPhone,
-    verifyOtp,
-    resendOtp,
-    guestLogin,
-    logout,
+    role: user?.role || null,
+    isAuthenticated: !!user && !user.isAnonymous,
+    isGuest: user?.isAnonymous || false,
+    signIn,
+    signUp,
+    signOut,
     resetPassword,
-    updateUserProfile,
-    updateUserEmail,
-    updateUserPassword,
-    deleteAccount,
-    recaptchaVerifier,
+    updateProfile,
+    signInWithPhone,
+    verifyOtp,
+    guestSignIn,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-      {/* Hidden reCAPTCHA container */}
-      <div id="recaptcha-container"></div>
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// Custom hook to use the auth context
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {

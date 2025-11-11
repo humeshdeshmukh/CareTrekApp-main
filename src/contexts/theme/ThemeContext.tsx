@@ -18,6 +18,7 @@ interface ThemeColors {
   error: string;
   success: string;
   warning: string;
+  danger: string;
   isDark: boolean;
 }
 
@@ -36,6 +37,7 @@ const LIGHT_THEME: ThemeColors = {
   error: '#E53E3E',
   success: '#38A169',
   warning: '#DD6B20',
+  danger: '#E53E3E',
   isDark: false,
 };
 
@@ -54,6 +56,7 @@ const DARK_THEME: ThemeColors = {
   error: '#FC8181',
   success: '#48BB78',
   warning: '#F6AD55',
+  danger: '#FC8181',
   isDark: true,
 };
 

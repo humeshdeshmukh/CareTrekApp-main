@@ -1,8 +1,15 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from '../contexts/theme/ThemeContext';
+import AuthCheck from './AuthCheck';
 
-// Import screens
+// Import auth screens and navigator
+import { AuthNavigator } from './AuthNavigator';
+import FamilyAuthScreen from '../screens/auth/FamilyAuthScreen';
+import SeniorAuthScreen from '../screens/auth/SeniorAuthScreen';
+import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
+
+// Import initial flow screens
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LanguageScreen from '../screens/LanguageScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
@@ -30,6 +37,26 @@ import FamilyNavigator from './FamilyNavigator';
 import { SeniorTabs } from './SeniorTabs';
 
 export type RootStackParamList = {
+  // Auth Stack
+  Auth: {
+    screen: keyof AuthStackParamList;
+    params?: any;
+  };
+  // Role selection screen
+  RoleSelection: undefined;
+  FamilyAuth: { role?: UserRole };
+  SeniorAuth: { role?: UserRole };
+  SignIn: { role?: UserRole };
+  SignUp: { role?: UserRole };
+  ForgotPassword: undefined;
+  OTPVerification: { 
+    phoneNumber: string;
+    verificationId: string;
+    role: UserRole;
+    isSignUp?: boolean;
+  };
+  Emergency: { role: UserRole };
+  
   // Initial flow
   Welcome: undefined;
   Language: undefined;
@@ -69,10 +96,10 @@ export type RootStackParamList = {
   Map: undefined;
   Reminders: undefined;
   SOSContacts: undefined;
-  
-  // Add index signature for dynamic routes
-  [key: string]: undefined | object;
 };
+
+// Import AuthStackParamList from types
+import { AuthStackParamList, UserRole } from './types';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -80,19 +107,114 @@ const RootNavigator = () => {
   const { colors, isDark } = useTheme();
 
   return (
-    <Stack.Navigator
-      initialRouteName="Welcome"
-      screenOptions={{
-        headerShown: false,
-        cardStyle: { backgroundColor: isDark ? '#1A202C' : '#FFFFFF' },
-      }}
-    >
-      {/* Initial Flow */}
-      <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="Language" component={LanguageScreen} />
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-      <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
-      <Stack.Screen name="SOSContacts" component={SOSContactsScreen} />
+    <AuthCheck>
+      <Stack.Navigator
+        initialRouteName="Welcome"
+        screenOptions={{
+          headerShown: false,
+          cardStyle: { backgroundColor: isDark ? '#1A202C' : '#FFFFFF' },
+        }}
+      >
+        {/* Initial screens */}
+        <Stack.Screen 
+          name="Welcome" 
+          component={WelcomeScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Language" 
+          component={LanguageScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Onboarding" 
+          component={OnboardingScreen}
+          options={{ headerShown: false }}
+        />
+        
+        {/* Role Selection Screen */}
+        <Stack.Screen 
+          name="RoleSelection" 
+          component={RoleSelectionScreen}
+          options={{
+            headerShown: false,
+            gestureEnabled: false,
+          }}
+        />
+        
+        {/* Auth Stack */}
+        <Stack.Screen 
+          name="Auth" 
+          component={AuthNavigator}
+          options={{ 
+            headerShown: false,
+            gestureEnabled: false,
+          }}
+        />
+        
+        {/* Individual auth screens (kept for direct navigation if needed) */}
+        <Stack.Screen 
+          name="FamilyAuth" 
+          component={FamilyAuthScreen}
+          options={{
+            title: 'Family Member',
+            headerShown: true,
+            headerBackTitle: 'Back',
+            headerStyle: {
+              backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 0,
+            },
+            headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
+          }}
+        />
+        
+        <Stack.Screen 
+          name="SeniorAuth" 
+          component={SeniorAuthScreen}
+          options={{
+            title: 'Senior',
+            headerShown: true,
+            headerBackTitle: 'Back',
+            headerStyle: {
+              backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 0,
+            },
+            headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
+          }}
+        />
+        
+        <Stack.Screen 
+          name="OTPVerification" 
+          component={OTPVerificationScreen}
+          options={{
+            title: 'Verify Phone',
+            headerShown: true,
+            headerBackTitle: 'Back',
+            headerStyle: {
+              backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 0,
+            },
+            headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
+          }}
+        />
+        
+        {/* Emergency Screen
+        <Stack.Screen 
+          name="Emergency" 
+          component={EmergencyScreen}
+          options={{
+            headerShown: false,
+            gestureEnabled: false,
+          }}
+        />
+        
+        <Stack.Screen name="SOSContacts" component={SOSContactsScreen} /> */}
       
       {/* Main App Tabs */}
       <Stack.Screen 
@@ -235,11 +357,11 @@ const RootNavigator = () => {
           },
           headerTitleStyle: {
             fontWeight: '600',
-            color: isDark ? '#FFFFFF' : '#2D3748',
           },
         }}
       />
     </Stack.Navigator>
+  </AuthCheck>
   );
 };
 

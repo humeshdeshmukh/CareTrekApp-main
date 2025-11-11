@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/theme/ThemeContext';
 import { SeniorTabParamList } from '../types/navigation';
 
@@ -10,6 +10,7 @@ import HomeScreen from '../screens/Senior/HomeScreen';
 import MapScreen from '../screens/Senior/MapScreen';
 import HealthScreen from '../screens/Senior/HealthScreen';
 import RemindersScreen from '../screens/Senior/RemindersScreen';
+import ProfileScreen from '../screens/Senior/ProfileScreen';
 
 const Tab = createBottomTabNavigator<SeniorTabParamList>();
 
@@ -37,6 +38,9 @@ export const SeniorTabs = () => {
             case 'Reminders':
               iconName = focused ? 'alarm' : 'alarm-outline';
               break;
+            case 'Profile':
+              iconName = focused ? 'person' : 'person-outline';
+              break;
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -61,6 +65,16 @@ export const SeniorTabs = () => {
         name="Reminders" 
         component={RemindersScreen} 
         options={{ title: 'Reminders' }} 
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen} 
+        options={{ 
+          title: 'Profile',
+          headerShown: true,
+          headerTitle: 'My Profile',
+          headerTitleAlign: 'center',
+        }} 
       />
     </Tab.Navigator>
   );

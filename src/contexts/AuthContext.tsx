@@ -1,172 +1,300 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../../supabaseConfig';
+import { Session } from '@supabase/supabase-js';
 
 // User type
+type UserRole = 'family' | 'senior' | null;
+
 type User = {
-  uid: string;
+  id: string;
+  uid: string; // Add uid to match Firebase's user.uid
   email: string | null;
   displayName: string | null;
   emailVerified: boolean;
+  role: UserRole;
   isAnonymous?: boolean;
-  photoURL?: string;
+  photoURL?: string | null;
+  phoneNumber?: string | null;
 } | null;
 
 // Auth context type
-type AuthContextType = {
+type SignInResult = {
   user: User;
+  session: Session | null;
+};
+
+type AuthContextType = {
+  user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  signIn: (email: string, password: string, role: UserRole) => Promise<SignInResult>;
+  signUp: (email: string, password: string, displayName: string, role: UserRole) => Promise<SignInResult>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   sendPasswordResetEmail: (email: string) => Promise<void>;
   confirmPasswordReset: (code: string, newPassword: string) => Promise<void>;
-  signInAnonymously: () => Promise<void>;
-  updateProfile: (displayName: string, photoURL?: string) => Promise<void>;
-  updateEmail: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
-  reloadUser: () => Promise<void>;
-  deleteAccount: () => Promise<void>;
+  updateProfile: (updates: { displayName?: string; photoURL?: string | null }) => Promise<void>;
+  reloadUser: () => Promise<User | null>;
+  role: UserRole | null;
+  setRole: (role: UserRole | null) => void;
 };
 
 // Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user data
-const MOCK_USER: User = {
-  uid: 'mock-user-id',
-  email: 'dev@caretrek.app',
-  displayName: 'Dev User',
-  emailVerified: true,
-  isAnonymous: false,
-};
-
 // Auth provider component
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const navigation = useNavigation();
 
-  // Simulate auth state check
+  // Check user session on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setUser(MOCK_USER);
-      setLoading(false);
-    }, 1000);
+    const getSession = async () => {
+      try {
+        setLoading(true);
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) throw error;
+        
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            uid: session.user.id, // Map id to uid for compatibility
+            email: session.user.email,
+            displayName: session.user.user_metadata?.full_name || null,
+            emailVerified: session.user.confirmed_at !== null,
+            photoURL: session.user.user_metadata?.avatar_url || null,
+            phoneNumber: session.user.phone || null,
+            role: role, // Include the role from state
+          });
+        }
+      } catch (error) {
+        console.error('Error getting session:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => clearTimeout(timer);
+    getSession();
+
+    // Listen for changes in auth state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            uid: session.user.id, // Map id to uid for compatibility
+            email: session.user.email,
+            displayName: session.user.user_metadata?.full_name || null,
+            emailVerified: session.user.confirmed_at !== null,
+            photoURL: session.user.user_metadata?.avatar_url || null,
+            phoneNumber: session.user.phone || null,
+            role: role, // Include the role from state
+          });
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
-  // Mock sign in
-  const signIn = async (email: string, password: string) => {
-    setLoading(true);
+  const signIn = async (email: string, password: string, userRole: UserRole): Promise<SignInResult> => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUser({
-        ...MOCK_USER,
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        displayName: email.split('@')[0],
+        password,
       });
-    } finally {
-      setLoading(false);
+
+      if (error) throw error;
+
+      if (data.user) {
+        const userData: User = {
+          id: data.user.id,
+          uid: data.user.id, // Map id to uid for compatibility
+          email: data.user.email || null,
+          displayName: data.user.user_metadata?.full_name || null,
+          emailVerified: data.user.confirmed_at !== null,
+          photoURL: data.user.user_metadata?.avatar_url || null,
+          phoneNumber: data.user.phone || null,
+          role: userRole,
+        };
+        
+        setUser(userData);
+        setRole(userRole);
+        
+        return { 
+          user: userData, 
+          session: data.session 
+        };
+      }
+      
+      throw new Error('No user data returned from sign in');
+    } catch (error) {
+      console.error('Error signing in:', error);
+      throw error;
     }
   };
 
-  // Mock sign up
-  const signUp = async (email: string, password: string, displayName: string) => {
-    setLoading(true);
+  const signUp = async (email: string, password: string, displayName: string, userRole: UserRole): Promise<SignInResult> => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUser({
-        ...MOCK_USER,
+      const { data, error } = await supabase.auth.signUp({
         email,
-        displayName,
-        emailVerified: false,
+        password,
+        options: {
+          data: {
+            full_name: displayName,
+            role: userRole,
+          },
+        },
       });
-    } finally {
-      setLoading(false);
+
+      if (error) throw error;
+
+      if (data.user) {
+        const userData: User = {
+          id: data.user.id,
+          uid: data.user.id, // Map id to uid for compatibility
+          email: data.user.email || null,
+          displayName,
+          emailVerified: data.user.confirmed_at !== null,
+          photoURL: data.user.user_metadata?.avatar_url || null,
+          phoneNumber: data.user.phone || null,
+          role: userRole,
+        };
+        
+        setUser(userData);
+        setRole(userRole);
+        
+        return { 
+          user: userData, 
+          session: data.session 
+        };
+      }
+      
+      throw new Error('No user data returned from sign up');
+    } catch (error) {
+      console.error('Error signing up:', error);
+      throw error;
     }
   };
 
-  // Mock sign out
-  const signOut = async () => {
-    setLoading(true);
+  const signOut = async (): Promise<void> => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       setUser(null);
-    } finally {
-      setLoading(false);
+      setRole(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+      throw error;
     }
   };
 
-  // Mock password reset
-  const sendPasswordResetEmail = async (email: string) => {
-    console.log(`Password reset email sent to: ${email}`);
-    return Promise.resolve();
-  };
-
-  // Mock confirm password reset
-  const confirmPasswordReset = async (code: string, newPassword: string) => {
-    console.log(`Password reset confirmed with code: ${code}`);
-    return Promise.resolve();
-  };
-
-  // Mock anonymous sign in
-  const signInAnonymously = async () => {
-    setLoading(true);
+  const deleteAccount = async (): Promise<void> => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setUser({
-        uid: 'anonymous-user-id',
-        email: null,
-        displayName: 'Guest',
-        emailVerified: false,
-        isAnonymous: true,
-      });
+      setLoading(true);
+      
+      // Call the API to delete the user account
+      const { error } = await deleteUserAccount();
+      
+      if (error) {
+        console.error('Error deleting account:', error);
+        throw new Error(error.message || 'Failed to delete account');
+      }
+      
+      // Sign out the user after successful deletion
+      await signOut();
+      
+      // Clear local state
+      setUser(null);
+      setRole(null);
+      
+    } catch (error) {
+      console.error('Error in deleteAccount:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock update profile
-  const updateProfile = async (displayName: string, photoURL?: string) => {
-    if (user) {
-      setUser({
-        ...user,
-        displayName,
-        photoURL,
-      });
+  const sendPasswordResetEmail = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      throw error;
     }
-    return Promise.resolve();
   };
 
-  // Mock update email
-  const updateEmail = async (email: string) => {
-    if (user) {
-      setUser({
-        ...user,
-        email,
-        emailVerified: false,
+  const confirmPasswordReset = async (code: string, newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
       });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error confirming password reset:', error);
+      throw error;
     }
-    return Promise.resolve();
   };
 
-  // Mock update password
-  const updatePassword = async (password: string) => {
-    console.log('Password updated');
-    return Promise.resolve();
+  const updateProfile = async (updates: { displayName?: string; photoURL?: string | null }): Promise<void> => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: updates.displayName,
+          avatar_url: updates.photoURL,
+        },
+      });
+      
+      if (error) throw error;
+
+      setUser(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          displayName: updates.displayName !== undefined ? updates.displayName : prev.displayName,
+          photoURL: updates.photoURL !== undefined ? updates.photoURL : prev.photoURL,
+        };
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
   };
 
-  // Mock reload user
-  const reloadUser = async () => {
-    return Promise.resolve();
-  };
-
-  // Mock delete account
-  const deleteAccount = async () => {
-    await signOut();
-    return Promise.resolve();
+  const reloadUser = async (): Promise<User | null> => {
+    try {
+      const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+      if (error) throw error;
+      
+      if (currentUser) {
+        const userData: User = {
+          id: currentUser.id,
+          email: currentUser.email || null,
+          displayName: currentUser.user_metadata?.full_name || null,
+          emailVerified: currentUser.confirmed_at !== null,
+          photoURL: currentUser.user_metadata?.avatar_url || null,
+          phoneNumber: currentUser.phone || null,
+          role: role || null,
+        };
+        setUser(userData);
+        return userData;
+      }
+      
+      setUser(null);
+      return null;
+    } catch (error) {
+      console.error('Error reloading user:', error);
+      throw error;
+    }
   };
 
   // Show loading indicator while checking auth state
@@ -178,24 +306,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  const authContextValue: AuthContextType = {
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    deleteAccount,
+    sendPasswordResetEmail,
+    confirmPasswordReset,
+    updateProfile,
+    reloadUser,
+    role,
+    setRole,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        sendPasswordResetEmail,
-        confirmPasswordReset,
-        signInAnonymously,
-        updateProfile,
-        updateEmail,
-        updatePassword,
-        reloadUser,
-        deleteAccount,
-      }}
-    >
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );

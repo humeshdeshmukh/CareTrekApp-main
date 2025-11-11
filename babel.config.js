@@ -11,11 +11,23 @@ module.exports = function(api) {
           root: ['./src'],
           extensions: ['.ios.js', '.android.js', '.js', '.ts', '.tsx', '.json'],
           alias: {
-            // Only include necessary Firebase modules
-            '@react-native-firebase/app': './src/config/firebase',
-            '@react-native-firebase/firestore': './src/config/firebase',
-            'firebase': './src/config/firebase',
+            // Add your path aliases here if needed
           },
+        },
+      ],
+      [
+        'module:react-native-dotenv',
+        {
+          moduleName: '@env',
+          path: '.env',
+          safe: false,
+          allowUndefined: true,
+          allowlist: [
+            'SUPABASE_URL',
+            'SUPABASE_ANON_KEY',
+            'EXPO_PUBLIC_SUPABASE_URL',
+            'EXPO_PUBLIC_SUPABASE_ANON_KEY'
+          ],
         },
       ],
       'react-native-reanimated/plugin',

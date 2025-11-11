@@ -1,24 +1,28 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { 
   createBottomTabNavigator,
-  BottomTabNavigationProp,
-  BottomTabBarButtonProps
+  BottomTabBarButtonProps,
+  BottomTabNavigationProp
 } from '@react-navigation/bottom-tabs';
+import { 
+  NavigationContainerRef,
+  useNavigationContainerRef
+} from '@react-navigation/native';
 import { 
   createStackNavigator, 
   StackNavigationProp,
-  CommonActions
+  CardStyleInterpolators
 } from '@react-navigation/stack';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/theme/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { 
-  NavigationContainerRef, 
   TouchableOpacity,
-  TouchableOpacityProps
+  View,
+  StyleSheet,
+  Platform
 } from 'react-native';
 
-// Import all family screens
 import HomeScreenFamily from '../screens/family/HomeScreenFamily';
 import SeniorsListScreen from '../screens/family/SeniorsListScreen';
 import SeniorDetailScreen from '../screens/family/SeniorDetailScreen';
@@ -27,9 +31,11 @@ import MessagesScreen from '../screens/family/MessagesScreen';
 import FamilySettingsScreen from '../screens/family/FamilySettingsScreen';
 import NewConnectSeniorScreen from '../screens/family/NewConnectSeniorScreen';
 import HealthHistoryScreen from '../screens/family/HealthHistoryScreen';
+import ShareIdScreen from '../screens/family/ShareIdScreen';
+import AddFamilyKeyScreen from '../screens/family/AddFamilyKeyScreen';
 
 // Type definitions for tab navigation
-export type FamilyTabParamList = {
+type FamilyTabParamList = {
   Home: undefined;
   Seniors: { refresh?: boolean };
   Alerts: undefined;
@@ -38,11 +44,11 @@ export type FamilyTabParamList = {
 };
 
 // Type definitions for stack navigation
-export type FamilyStackParamList = {
+type FamilyStackParamList = {
   // Tabs
   MainTabs: undefined;
   
-  // Screens
+  // Main Screens
   Home: undefined;
   Seniors: { refresh?: boolean };
   SeniorDetail: { seniorId: string };
@@ -50,6 +56,10 @@ export type FamilyStackParamList = {
   Alerts: undefined;
   Messages: { recipientId?: string };
   Settings: undefined;
+  
+  // Family Key Management
+  ShareId: undefined;
+  AddFamilyKey: undefined;
   
   // Other family screens
   SeniorDetailScreen: { seniorId: string };
@@ -61,30 +71,43 @@ export type FamilyStackParamList = {
 const Tab = createBottomTabNavigator<FamilyTabParamList>();
 const Stack = createStackNavigator<FamilyStackParamList>();
 
-// Create a navigation reference for programmatic navigation
-export const navigationRef = React.createRef<NavigationContainerRef<FamilyStackParamList>>();
+// Card style for stack navigation
+const cardStyleInterpolator = CardStyleInterpolators.forHorizontalIOS;
+
+// Create a navigation reference that will be used by the app
+export let navigationRef: NavigationContainerRef<FamilyStackParamList> | null = null;
 
 // Helper function to navigate to any screen
 export function navigate(name: keyof FamilyStackParamList, params?: any) {
-  navigationRef.current?.navigate(name as any, params);
+  if (navigationRef?.isReady()) {
+    navigationRef.navigate(name as any, params);
+  }
 }
 
 // Custom tab bar button with press handling
-const TabBarButton: React.FC<TouchableOpacityProps & BottomTabBarButtonProps> = ({
+const TabBarButton: React.FC<BottomTabBarButtonProps> = ({
   children,
   onPress,
+  accessibilityState,
   ...props
 }) => {
+  const isFocused = accessibilityState?.selected;
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
-      {...props}
-      activeOpacity={0.7}
       onPress={onPress}
       style={{
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: isFocused ? colors.primaryLight : 'transparent',
+        margin: 4,
+        borderRadius: 8,
       }}
+      activeOpacity={0.8}
+      // @ts-ignore - Fix for TouchableOpacity type issue
+      {...props}
     >
       {children}
     </TouchableOpacity>
@@ -96,202 +119,74 @@ const TabNavigator = () => {
   const { isDark } = useTheme();
   const { t } = useTranslation();
 
-  // Translations
-  const homeText = t('Home') || 'Home';
-  const seniorsText = t('Seniors') || 'Seniors';
-  const alertsText = t('Alerts') || 'Alerts';
-  const messagesText = t('Messages') || 'Messages';
-  const settingsText = t('Settings') || 'Settings';
-
-  // Handle deep linking and automatic navigation
-  useEffect(() => {
-    // This would be connected to your deep linking or notification handlers
-    // Example: Subscribe to notification events and navigate accordingly
-    const handleNotification = (data: any) => {
-      if (data?.type === 'alert') {
-        tabBarRef.current?.navigate('Alerts');
-      } else if (data?.type === 'message') {
-        tabBarRef.current?.navigate('Messages');
-      }
-    };
-
-    // Cleanup
-    return () => {
-      // Unsubscribe from any listeners
-    };
-  }, []);
+  // Custom tab bar button component
+  const TabBarButtonComponent: React.FC<BottomTabBarButtonProps> = (props) => (
+    <TabBarButton {...props} />
+  );
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          if (route.name === 'Home') {
-            return <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />;
-          } else if (route.name === 'Seniors') {
-            return <Ionicons name={focused ? 'people' : 'people-outline'} size={size} color={color} />;
-          } else if (route.name === 'Alerts') {
-            return (
-              <MaterialCommunityIcons
-                name={focused ? 'bell' : 'bell-outline'}
-                size={size}
-                color={color}
-              />
-            );
-          } else if (route.name === 'Messages') {
-            return (
-              <Ionicons
-                name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
-                size={size}
-                color={color}
-              />
-            );
-          } else if (route.name === 'Settings') {
-            return <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />;
-          }
-        },
-        tabBarActiveTintColor: isDark ? '#48BB78' : '#2F855A',
-        tabBarInactiveTintColor: isDark ? '#A0AEC0' : '#718096',
+      screenOptions={{
+        headerShown: false,
         tabBarStyle: {
           backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
           borderTopColor: isDark ? '#2D3748' : '#E2E8F0',
+          height: 60,
+          paddingBottom: 5,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          marginBottom: 4,
-        },
-        headerShown: false,
-      })}
+        tabBarActiveTintColor: isDark ? '#63B3ED' : '#2B6CB0',
+        tabBarInactiveTintColor: isDark ? '#A0AEC0' : '#718096',
+        tabBarButton: (props) => <TabBarButtonComponent {...props} />,
+      }}
     >
-      <Tab.Screen 
-        name="Home" 
-        component={HomeScreenFamily} 
+      <Tab.Screen
+        name="Home"
+        component={HomeScreenFamily}
         options={{
-          title: homeText,
-          tabBarAccessibilityLabel: homeText,
-          tabBarButton: (props) => (
-            <TabBarButton
-              {...props}
-              onPress={() => {
-                // Reset stack when pressing the active tab
-                if (props.accessibilityState?.selected) {
-                  // Reset to first screen in the stack
-                  props.navigation.dispatch(
-                    CommonActions.reset({
-                      index: 0,
-                      routes: [{ name: 'Home' }],
-                    })
-                  );
-                } else {
-                  props.onPress?.();
-                }
-              }}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
           ),
+          tabBarLabel: t('Home') || 'Home',
         }}
       />
-      <Tab.Screen 
-        name="Seniors" 
-        component={SeniorsListScreen} 
+      <Tab.Screen
+        name="Seniors"
+        component={SeniorsListScreen}
         options={{
-          title: seniorsText,
-          tabBarAccessibilityLabel: seniorsText,
-          tabBarButton: (props) => (
-            <TabBarButton
-              {...props}
-              onPress={() => {
-                if (props.accessibilityState?.selected) {
-                  props.navigation.dispatch(
-                    CommonActions.reset({
-                      index: 0,
-                      routes: [{ name: 'Seniors' }],
-                    })
-                  );
-                } else {
-                  props.onPress?.();
-                }
-              }}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people" size={size} color={color} />
           ),
+          tabBarLabel: t('Seniors') || 'Seniors',
         }}
       />
-      <Tab.Screen 
-        name="Alerts" 
-        component={AlertsScreen} 
+      <Tab.Screen
+        name="Alerts"
+        component={AlertsScreen}
         options={{
-          title: alertsText,
-          tabBarAccessibilityLabel: alertsText,
-          tabBarBadge: undefined, // Set to actual unread count when available
-          tabBarButton: (props) => (
-            <TabBarButton
-              {...props}
-              onPress={() => {
-                if (props.accessibilityState?.selected) {
-                  props.navigation.dispatch(
-                    CommonActions.reset({
-                      index: 0,
-                      routes: [{ name: 'Alerts' }],
-                    })
-                  );
-                } else {
-                  props.onPress?.();
-                }
-              }}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications" size={size} color={color} />
           ),
+          tabBarLabel: t('Alerts') || 'Alerts',
         }}
       />
-      <Tab.Screen 
-        name="Messages" 
-        component={MessagesScreen} 
+      <Tab.Screen
+        name="Messages"
+        component={MessagesScreen}
         options={{
-          title: messagesText,
-          tabBarAccessibilityLabel: messagesText,
-          tabBarLabelStyle: {
-            fontSize: 10,
-          },
-          tabBarBadge: undefined, // Set to actual unread count when available
-          tabBarButton: (props) => (
-            <TabBarButton
-              {...props}
-              onPress={() => {
-                if (props.accessibilityState?.selected) {
-                  props.navigation.dispatch(
-                    CommonActions.reset({
-                      index: 0,
-                      routes: [{ name: 'Messages' }],
-                    })
-                  );
-                } else {
-                  props.onPress?.();
-                }
-              }}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles" size={size} color={color} />
           ),
+          tabBarLabel: t('Messages') || 'Messages',
         }}
       />
-      <Tab.Screen 
-        name="Settings" 
-        component={FamilySettingsScreen} 
+      <Tab.Screen
+        name="Settings"
+        component={FamilySettingsScreen}
         options={{
-          title: settingsText,
-          tabBarAccessibilityLabel: settingsText,
-          tabBarButton: (props) => (
-            <TabBarButton
-              {...props}
-              onPress={() => {
-                if (props.accessibilityState?.selected) {
-                  props.navigation.dispatch(
-                    CommonActions.reset({
-                      index: 0,
-                      routes: [{ name: 'Settings' }],
-                    })
-                  );
-                } else {
-                  props.onPress?.();
-                }
-              }}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings" size={size} color={color} />
           ),
+          tabBarLabel: t('Settings') || 'Settings',
         }}
       />
     </Tab.Navigator>
@@ -299,66 +194,59 @@ const TabNavigator = () => {
 };
 
 // Main Family Navigator with Stack Navigation
-const FamilyNavigator = () => {
-  const { isDark } = useTheme();
+export const FamilyNavigator = () => {
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   
-  // Translations
-  const homeText = t('Home') || 'Home';
-  const seniorsText = t('Seniors') || 'Seniors';
-  const alertsText = t('Alerts') || 'Alerts';
-  const messagesText = t('Messages') || 'Messages';
-  const settingsText = t('Settings') || 'Settings';
-  const connectSeniorText = t('Connect Senior') || 'Connect Senior';
-  const seniorDetailsText = t('Senior Details') || 'Senior Details';
+  // Initialize the navigation ref
+  navigationRef = useNavigationContainerRef<FamilyStackParamList>();
 
   return (
     <Stack.Navigator
-      initialRouteName="MainTabs"
       screenOptions={{
         headerStyle: {
           backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
           elevation: 0,
           shadowOpacity: 0,
-          borderBottomWidth: 0,
         },
-        headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
+        headerTintColor: colors.primary,
         headerTitleStyle: {
           fontWeight: '600',
         },
-        headerBackTitle: '', // This replaces headerBackTitleVisible: false
+        cardStyle: { backgroundColor: colors.background },
+        cardStyleInterpolator,
       }}
     >
       <Stack.Screen 
         name="MainTabs" 
         component={TabNavigator} 
-        options={{ headerShown: false }} 
+        options={{ headerShown: false }}
       />
-      
-      {/* Screens that should not be in tabs */}
       <Stack.Screen 
         name="SeniorDetail" 
         component={SeniorDetailScreen} 
-        options={{ title: seniorDetailsText }} 
+        options={{ title: t('Senior Details') || 'Senior Details' }}
       />
-      
       <Stack.Screen 
-        name="NewConnectSenior" 
+        name="ConnectSenior" 
         component={NewConnectSeniorScreen} 
-        options={{ title: connectSeniorText }}
+        options={{ title: t('Connect Senior') || 'Connect Senior' }}
       />
-      
       <Stack.Screen 
-        name="Messages" 
-        component={MessagesScreen}
-        options={({ route }) => ({
-          title: route.params?.recipientId 
-            ? `${t('Messages')} - ${route.params.recipientId}`
-            : t('Messages') || 'Messages',
-          headerShown: true,
-        })} 
+        name="HealthHistory" 
+        component={HealthHistoryScreen} 
+        options={{ title: t('Health History') || 'Health History' }}
       />
-      
+      <Stack.Screen 
+        name="ShareId" 
+        component={ShareIdScreen} 
+        options={{ title: t('Share ID') || 'Share ID' }}
+      />
+      <Stack.Screen 
+        name="AddFamilyKey" 
+        component={AddFamilyKeyScreen} 
+        options={{ title: t('Add Family Member') || 'Add Family Member' }}
+      />
       <Stack.Screen 
         name="FamilySettings" 
         component={FamilySettingsScreen} 
@@ -366,15 +254,6 @@ const FamilyNavigator = () => {
           title: t('Settings') || 'Settings',
           headerShown: true,
         }} 
-      />
-      
-      <Stack.Screen 
-        name="HealthHistory" 
-        component={HealthHistoryScreen}
-        options={{
-          title: t('Health History') || 'Health History',
-          headerShown: true,
-        }}
       />
     </Stack.Navigator>
   );

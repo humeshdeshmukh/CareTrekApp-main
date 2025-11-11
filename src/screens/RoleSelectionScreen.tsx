@@ -2,12 +2,20 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { CompositeNavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { AuthStackParamList } from '../navigation/types';
+
+type RoleSelectionScreenNavigationProp = StackNavigationProp<RootStackParamList, 'RoleSelection'> & {
+  navigate: <T extends keyof AuthStackParamList>(
+    screen: T,
+    params: AuthStackParamList[T]
+  ) => void;
+};
 import { useTheme } from '../contexts/theme/ThemeContext';
 import { useTranslation } from '../contexts/translation/TranslationContext';
 import { useCachedTranslation } from '../hooks/useCachedTranslation';
 
-type RoleSelectionScreenNavigationProp = StackNavigationProp<RootStackParamList, 'RoleSelection'>;
 
 const RoleSelectionScreen = ({ navigation }: { navigation: RoleSelectionScreenNavigationProp }) => {
   const { isDark } = useTheme();
@@ -24,11 +32,11 @@ const RoleSelectionScreen = ({ navigation }: { navigation: RoleSelectionScreenNa
   const handleRoleSelect = (role: 'senior' | 'family') => {
     console.log(`Selected role: ${role}`);
     if (role === 'senior') {
-      // Navigate to SeniorTabs stack
-      navigation.navigate('SeniorTabs');
+      // Navigate to Senior authentication flow
+      navigation.navigate('SeniorAuth', { role: 'senior' } as any);
     } else {
-      // Navigate to HomeScreenFamily for family members
-      navigation.navigate('HomeScreenFamily');
+      // Navigate to Family authentication flow
+      navigation.navigate('FamilyAuth', { role: 'family' } as any);
     }
   };
 

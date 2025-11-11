@@ -3,7 +3,7 @@ export type SeniorTabParamList = {
   Map: undefined;
   Health: undefined;
   Reminders: undefined;
-  More: undefined;
+  Profile: undefined;
 };
 
 export type FamilyTabParamList = {

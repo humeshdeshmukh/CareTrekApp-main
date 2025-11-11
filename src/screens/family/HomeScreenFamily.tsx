@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useNavigation, useIsFocused, useTheme as useNavTheme } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import ShareIdButton from '../../components/ShareIdButton';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
@@ -48,6 +49,9 @@ type RootStackParamList = {
   ConnectSenior: undefined;
   Home: undefined;
   MainTabs: undefined;
+  // Add family key screens
+  ShareId: undefined;
+  AddFamilyKey: undefined;
 };
 
 const { width } = Dimensions.get('window');
@@ -278,6 +282,16 @@ const HomeScreenFamily = () => {
       </Text>
     </View>
   );
+
+  // Handle share ID button press
+  const handleShareIdPress = () => {
+    navigation.navigate('ShareId');
+  };
+
+  // Handle add family member press
+  const handleAddFamilyMember = () => {
+    navigation.navigate('AddFamilyKey');
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
