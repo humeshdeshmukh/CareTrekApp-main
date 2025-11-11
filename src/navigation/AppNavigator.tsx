@@ -8,7 +8,7 @@ import SplashScreen from '../screens/SplashScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import RoleSelectionScreen from '../screens/RoleSelectionScreen';
 import SeniorAuthScreen from '../screens/auth/SeniorAuthScreen';
-import FamilyAuthScreen from '../screens/auth/FamilyAuthScreen';
+import FamilySignInScreen from '../screens/auth/FamilySignInScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
 import SeniorHomeScreen from '../screens/senior/SeniorHomeScreen';
 import FamilyHomeScreen from '../screens/family/FamilyHomeScreen';
@@ -23,6 +23,7 @@ type AuthStackParamList = {
     email?: string;
     name?: string;
     phoneNumber?: string;
+    onSuccess?: () => void;
   };
   ForgotPassword: { email?: string };
   FamilyAuth: { role?: 'family' };
@@ -36,12 +37,13 @@ export type RootStackParamList = {
   Onboarding: undefined;
   RoleSelection: undefined;
   SeniorAuth: { role?: 'senior' };
-  FamilyAuth: { role?: 'family' };
+  FamilySignIn: { email?: string };
   SignUp: {
     role: 'senior' | 'family';
     email?: string;
     name?: string;
     phoneNumber?: string;
+    onSuccess?: () => void;
   };
   ForgotPassword: { email?: string };
   
@@ -107,9 +109,9 @@ const AppNavigator = () => {
               initialParams={{ role: 'senior' }}
             />
             <Stack.Screen 
-              name="FamilyAuth" 
-              component={FamilyAuthScreen}
-              initialParams={{ role: 'family' }}
+              name="FamilySignIn" 
+              component={FamilySignInScreen}
+              options={{ title: 'Family Sign In' }}
             />
             <Stack.Screen 
               name="SignUp" 

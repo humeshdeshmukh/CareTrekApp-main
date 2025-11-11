@@ -20,7 +20,9 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { supabase } from '../../lib/supabase';
 
-type SignUpScreenNavigationProp = StackNavigationProp<RootStackParamList, 'SignUp'>;
+type SignUpScreenNavigationProp = StackNavigationProp<RootStackParamList, 'SignUp'> & {
+  onSuccess?: () => void;
+};
 
 const SignUpScreen: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -162,15 +164,21 @@ const SignUpScreen: React.FC = () => {
           }
         }
 
-        // Show success message and navigate back to sign in
         Alert.alert(
-          'Account Created',
-          'Please check your email to verify your account before signing in.',
+          'Success',
+          'Your account has been created successfully! Please check your email to verify your account.',
           [
             {
               text: 'OK',
-              onPress: () => navigation.navigate('FamilyAuth')
-            }
+              onPress: () => {
+                // Call the onSuccess callback if provided, otherwise navigate to FamilySignIn
+                if (route.params?.onSuccess) {
+                  route.params.onSuccess();
+                } else {
+                  navigation.navigate('FamilySignIn', { email: formData.email });
+                }
+              },
+            },
           ]
         );
       }

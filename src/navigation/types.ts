@@ -10,7 +10,7 @@ export type SignUpParams = {
 export type AuthStackParamList = {
   // Authentication Flow
   Welcome: undefined;
-  FamilyAuth: { role?: UserRole };
+  FamilySignIn: { email?: string };
   SeniorAuth: { role?: UserRole };
   SignIn: { role?: UserRole };
   SignUp: SignUpParams;

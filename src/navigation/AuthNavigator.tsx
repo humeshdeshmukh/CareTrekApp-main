@@ -5,9 +5,8 @@ import { AuthStackParamList, UserRole } from './types';
 
 // Import screens
 import WelcomeScreen from '../screens/WelcomeScreen';
-import FamilyAuthScreen from '../screens/auth/FamilyAuthScreen';
+import FamilySignInScreen from '../screens/auth/FamilySignInScreen';
 import SeniorAuthScreen from '../screens/auth/SeniorAuthScreen';
-import SignInScreen from '../screens/auth/SignInScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
@@ -44,12 +43,12 @@ export const AuthNavigator = () => {
         options={{ headerShown: false }}
       />
 
-      {/* Family Authentication */}
+      {/* Family Auth Flow - Using FamilySignInScreen */}
       <Stack.Screen 
-        name="FamilyAuth" 
-        component={FamilyAuthScreen}
+        name="FamilySignIn" 
+        component={FamilySignInScreen}
         options={{ 
-          title: 'Family Member Sign In',
+          title: 'Family Member',
           headerBackTitle: 'Back',
         }}
       />
@@ -67,10 +66,22 @@ export const AuthNavigator = () => {
       {/* Shared Auth Screens */}
       <Stack.Screen 
         name="SignIn" 
-        component={SignInScreen}
+        component={FamilySignInScreen}
         options={{ 
           title: 'Sign In',
           headerBackTitle: 'Back',
+          headerShown: true,
+          headerTitleStyle: {
+            fontSize: 20,
+            fontWeight: '600',
+          },
+          headerStyle: {
+            backgroundColor: colors.background,
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 0,
+          },
+          headerTintColor: colors.primary,
         }}
       />
 

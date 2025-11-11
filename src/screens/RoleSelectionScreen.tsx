@@ -7,9 +7,9 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import { AuthStackParamList } from '../navigation/types';
 
 type RoleSelectionScreenNavigationProp = StackNavigationProp<RootStackParamList, 'RoleSelection'> & {
-  navigate: <T extends keyof AuthStackParamList>(
+  navigate: <T extends keyof (AuthStackParamList & { FamilySignIn: { email?: string } })>(
     screen: T,
-    params: AuthStackParamList[T]
+    params?: (AuthStackParamList & { FamilySignIn: { email?: string } })[T]
   ) => void;
 };
 import { useTheme } from '../contexts/theme/ThemeContext';
@@ -36,7 +36,7 @@ const RoleSelectionScreen = ({ navigation }: { navigation: RoleSelectionScreenNa
       navigation.navigate('SeniorAuth', { role: 'senior' } as any);
     } else {
       // Navigate to Family authentication flow
-      navigation.navigate('FamilyAuth', { role: 'family' } as any);
+      navigation.navigate('FamilySignIn');
     }
   };
 

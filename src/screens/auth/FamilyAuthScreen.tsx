@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -8,7 +8,8 @@ import {
   Alert, 
   Platform,
   KeyboardAvoidingView,
-  ScrollView
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -16,6 +17,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../../supabaseConfig';
 
 type FamilyAuthScreenNavigationProp = StackNavigationProp<RootStackParamList, 'FamilyAuth' | 'Auth'>;
 
@@ -27,6 +29,26 @@ const FamilyAuthScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // The navigation will be handled by the AppNavigator's conditional rendering
+          // based on the authentication state
+        }
+      } catch (error) {
+        console.error('Error checking auth state:', error);
+      } finally {
+        setAuthChecked(true);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -36,8 +58,10 @@ const FamilyAuthScreen = () => {
 
     setIsLoading(true);
     try {
-      await signIn(email, password);
-      // Navigation to family home will be handled by the auth state change
+      await signIn(email, password, 'family');
+      
+      // The navigation will be handled by the AppNavigator's conditional rendering
+      // based on the updated authentication state
     } catch (error: any) {
       let errorMessage = 'An error occurred during sign in';
       
@@ -76,6 +100,15 @@ const FamilyAuthScreen = () => {
   const navigateToForgotPassword = () => {
     navigation.navigate('ForgotPassword', { email });
   };
+
+  // Show loading indicator while checking auth state
+  if (!authChecked) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView 

@@ -5,8 +5,9 @@ import AuthCheck from './AuthCheck';
 
 // Import auth screens and navigator
 import { AuthNavigator } from './AuthNavigator';
-import FamilyAuthScreen from '../screens/auth/FamilyAuthScreen';
+import FamilySignInScreen from '../screens/auth/FamilySignInScreen';
 import SeniorAuthScreen from '../screens/auth/SeniorAuthScreen';
+import SignUpScreen from '../screens/auth/SignUpScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 
 // Import initial flow screens
@@ -44,7 +45,7 @@ export type RootStackParamList = {
   };
   // Role selection screen
   RoleSelection: undefined;
-  FamilyAuth: { role?: UserRole };
+  FamilySignIn: { email?: string };
   SeniorAuth: { role?: UserRole };
   SignIn: { role?: UserRole };
   SignUp: { role?: UserRole };
@@ -61,7 +62,6 @@ export type RootStackParamList = {
   Welcome: undefined;
   Language: undefined;
   Onboarding: undefined;
-  RoleSelection: undefined;
   
   // Main App
   Main: undefined;
@@ -154,18 +154,11 @@ const RootNavigator = () => {
         
         {/* Individual auth screens (kept for direct navigation if needed) */}
         <Stack.Screen 
-          name="FamilyAuth" 
-          component={FamilyAuthScreen}
+          name="FamilySignIn" 
+          component={FamilySignInScreen}
           options={{
-            title: 'Family Member',
+            title: 'Family Member Sign In',
             headerShown: true,
-            headerBackTitle: 'Back',
-            headerStyle: {
-              backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
-              elevation: 0,
-              shadowOpacity: 0,
-              borderBottomWidth: 0,
-            },
             headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
           }}
         />
@@ -192,6 +185,42 @@ const RootNavigator = () => {
           component={OTPVerificationScreen}
           options={{
             title: 'Verify Phone',
+            headerShown: true,
+            headerBackTitle: 'Back',
+            headerStyle: {
+              backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 0,
+            },
+            headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
+          }}
+        />
+        
+        {/* Sign Up Screen */}
+        <Stack.Screen 
+          name="SignUp" 
+          component={SignUpScreen}
+          options={{
+            title: 'Create Account',
+            headerShown: true,
+            headerBackTitle: 'Back',
+            headerStyle: {
+              backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 0,
+            },
+            headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
+          }}
+        />
+        
+        {/* Sign In Screen - Using FamilySignInScreen as the main sign-in screen */}
+        <Stack.Screen 
+          name="SignIn" 
+          component={FamilySignInScreen}
+          options={{
+            title: 'Sign In',
             headerShown: true,
             headerBackTitle: 'Back',
             headerStyle: {

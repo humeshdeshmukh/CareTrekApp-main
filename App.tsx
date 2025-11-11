@@ -10,7 +10,7 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './src/store/store';
 import { ThemeProvider } from './src/contexts/theme/ThemeContext';
 import { TranslationProvider } from './src/contexts/translation/TranslationContext';
-import { AuthProvider } from './src/contexts/AuthContext';
+import { AuthProvider } from './src/contexts/auth/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
