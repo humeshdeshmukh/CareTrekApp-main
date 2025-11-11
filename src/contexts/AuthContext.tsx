@@ -261,10 +261,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (!user) throw new Error('No user is signed in');
       
-      // Prepare update data
+      // Prepare update data for user metadata
       const updateData: any = {};
       
-      // Only include displayName and photoURL in the data object (Supabase auth metadata)
+      // Update displayName and photoURL in the user metadata
       if (updates.displayName !== undefined) {
         updateData.displayName = updates.displayName;
       }
@@ -280,6 +280,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (emailError) throw emailError;
       }
       
+      // Update phone number if provided - store in user metadata instead of phone auth
+      if (updates.phoneNumber !== undefined) {
+        // Store phone number in user metadata
+        updateData.phoneNumber = updates.phoneNumber;
+      }
+      
       // Update user metadata
       if (Object.keys(updateData).length > 0) {
         const { error: updateError } = await supabase.auth.updateUser({
@@ -291,26 +297,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update local state
       setUser({
         ...user,
-        displayName: updates.displayName || user.displayName,
+        displayName: updates.displayName !== undefined ? updates.displayName : user.displayName,
         email: updates.email || user.email,
-        phoneNumber: updates.phoneNumber || user.phoneNumber,
+        phoneNumber: updates.phoneNumber !== undefined ? updates.phoneNumber : user.phoneNumber,
         ...updateData
       });
       
-      // Here you might want to update the user's profile in your database as well
-      // For example:
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          display_name: updates.displayName,
-          phone_number: updates.phoneNumber,
-          updated_at: new Date().toISOString(),
-        });
-      
-      if (profileError) {
-        console.error('Error updating profile in database:', profileError);
-        // Don't throw here as the auth update was successful
+      // Update the user's profile in the database
+      try {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            display_name: updates.displayName !== undefined ? updates.displayName : user.displayName,
+            phone_number: updates.phoneNumber !== undefined ? updates.phoneNumber : user.phoneNumber,
+            updated_at: new Date().toISOString(),
+          });
+        
+        if (profileError) {
+          console.error('Error updating profile in database:', profileError);
+          // Continue even if there's an error with the profiles table
+        }
+      } catch (error) {
+        console.error('Error in profile update transaction:', error);
+        // Continue even if there's an error
       }
       
     } catch (error) {

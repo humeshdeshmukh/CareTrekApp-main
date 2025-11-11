@@ -57,9 +57,10 @@ const ProfileScreen: React.FC = () => {
     try {
       setIsLoading(true);
       await signOut();
+      // Navigate to WelcomeScreen and reset the navigation stack
       navigation.reset({
         index: 0,
-        routes: [{ name: 'AuthSelection' }],
+        routes: [{ name: 'Welcome' }],
       });
     } catch (error) {
       console.error('Sign out error:', error);
@@ -82,9 +83,10 @@ const ProfileScreen: React.FC = () => {
             try {
               setIsLoading(true);
               await deleteAccount();
+              // Navigate to WelcomeScreen after account deletion
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'AuthSelection' }],
+                routes: [{ name: 'Welcome' }],
               });
             } catch (error) {
               console.error('Delete account error:', error);

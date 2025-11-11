@@ -53,7 +53,8 @@ export default function SignInScreen() {
 
   // Navigate to forgot password screen
   const navigateToForgotPassword = () => {
-    navigation.navigate('ForgotPassword');
+    // Use the navigation prop from the Auth stack
+    navigation.navigate('Auth', { screen: 'ForgotPassword' });
   };
 
   // Navigate back to auth selection

@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/theme/ThemeContext';
 import { AuthStackParamList, UserRole } from './types';
 
 // Import screens
-import AuthSelectionScreen from '../screens/auth/AuthSelectionScreen';
+import WelcomeScreen from '../screens/WelcomeScreen';
 import FamilyAuthScreen from '../screens/auth/FamilyAuthScreen';
 import SeniorAuthScreen from '../screens/auth/SeniorAuthScreen';
 import SignInScreen from '../screens/auth/SignInScreen';
@@ -12,7 +12,6 @@ import SignUpScreen from '../screens/auth/SignUpScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 import EditProfileScreen from '../screens/Senior/EditProfileScreen';
-// import EmergencyScreen from '../screens/Senior/EmergencyScreen';
 
 const Stack = createStackNavigator<AuthStackParamList>();
 
@@ -36,12 +35,12 @@ export const AuthNavigator = () => {
         },
         cardStyle: { backgroundColor: colors.background },
       }}
-      initialRouteName="AuthSelection"
+      initialRouteName="Welcome"
     >
-      {/* Auth Selection */}
+      {/* Welcome Screen */}
       <Stack.Screen 
-        name="AuthSelection" 
-        component={AuthSelectionScreen}
+        name="Welcome" 
+        component={WelcomeScreen}
         options={{ headerShown: false }}
       />
 

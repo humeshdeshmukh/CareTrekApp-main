@@ -157,7 +157,7 @@ const SignUpScreen = () => {
   };
   
   const handleForgotPassword = () => {
-    navigation.navigate('ForgotPassword');
+    navigation.navigate('Auth', { screen: 'ForgotPassword' });
   };
 
   return (
