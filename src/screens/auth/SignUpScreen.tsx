@@ -109,121 +109,84 @@ const SignUpScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    console.log('Starting signup process...');
-    if (!validateForm()) {
-      console.log('Form validation failed');
-      return;
-    }
+    if (!validateForm()) return;
 
+    console.log('Attempting to sign up user with email:', formData.email);
     setIsSubmitting(true);
+
     try {
-      console.log('Attempting to sign up user with email:', formData.email);
-      
-      // First, sign up the user
+      // Sign up the user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
-            display_name: formData.displayName,
+            full_name: formData.displayName,
+            phone: formData.phoneNumber || '',
             role: role,
-            phone_number: formData.phoneNumber
           },
-          // Skip email confirmation for now
-          emailRedirectTo: undefined
+          emailRedirectTo: 'caretrek://auth/callback', // Update with your app's URL scheme
         },
       });
 
       console.log('Signup response:', { authData, signUpError });
 
       if (signUpError) {
-        console.error('Signup error:', signUpError);
         throw signUpError;
       }
 
-      if (!authData.user) {
-        throw new Error('No user data returned from sign up');
+      if (authData.user) {
+        // First, try to get the user's profile
+        const { data: existingProfile, error: fetchError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', authData.user.id)
+          .single();
+
+        // Only create profile if it doesn't exist
+        if (!existingProfile) {
+          console.log('Creating profile in profiles table...');
+          const { error: profileError } = await supabase.rpc('create_profile', {
+            p_user_id: authData.user.id,
+            p_email: formData.email,
+            p_display_name: formData.displayName,
+            p_role: role,
+            p_phone_number: formData.phoneNumber
+          });
+
+          if (profileError) {
+            console.error('Profile creation error:', profileError);
+            // Don't fail the signup if profile creation fails
+            // The user can update their profile later
+            console.warn('Profile creation failed, but user account was created successfully');
+          }
+        }
+
+        // Show success message and navigate back to sign in
+        Alert.alert(
+          'Account Created',
+          'Please check your email to verify your account before signing in.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('FamilyAuth')
+            }
+          ]
+        );
       }
-
-      console.log('User created successfully, signing in...');
-      
-      // Sign in the user
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      console.log('Sign in response:', { signInData, signInError });
-
-      if (signInError) {
-        console.error('Sign in error:', signInError);
-        throw signInError;
-      }
-
-      console.log('Creating profile in profiles table...');
-      // Add to profiles table
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: authData.user.id,
-          email: formData.email,
-          display_name: formData.displayName,
-          role: role,
-          phone_number: formData.phoneNumber,
-          updated_at: new Date().toISOString()
-        })
-        .select();
-
-      console.log('Profile creation response:', { profileData, profileError });
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-        throw new Error('Failed to create user profile: ' + profileError.message);
-      }
-
-      console.log('Creating user_profile record...');
-      // Also create user_profile record
-      const { data: userProfileData, error: userProfileError } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id: authData.user.id,
-          full_name: formData.displayName,
-          updated_at: new Date().toISOString()
-        })
-        .select();
-
-      console.log('User profile creation response:', { userProfileData, userProfileError });
-
-      if (userProfileError) {
-        console.error('User profile creation error:', userProfileError);
-        // Don't throw here as the main account was created
-      }
-
-      console.log('Signup successful, navigating to home screen...');
-      
-      // Navigate to the appropriate home screen based on role
-      const targetScreen = role === 'senior' ? 'SeniorHome' : 'FamilyHome';
-      console.log('Navigating to:', targetScreen);
-      navigation.navigate(targetScreen as any);
-      
     } catch (error: any) {
-      console.error('Signup error details:', {
-        message: error.message,
-        code: error.code,
-        status: error.status,
-        stack: error.stack
-      });
+      console.error('Signup error details:', error);
       
-      let errorMessage = 'An error occurred while creating your account. Please try again.';
+      let errorMessage = 'An error occurred during sign up. Please try again.';
       
-      if (error.message.includes('already registered') || error.message.includes('already in use')) {
+      if (error.message.includes('User already registered')) {
         errorMessage = 'This email is already registered. Please sign in instead.';
-      } else if (error.message.includes('password') || error.message?.toLowerCase().includes('password')) {
-        errorMessage = 'Please choose a stronger password (min 6 characters)';
-      } else if (error.message.includes('email') || error.message?.toLowerCase().includes('email')) {
+      } else if (error.message.includes('Password should be at least')) {
+        errorMessage = 'Password must be at least 8 characters long.';
+      } else if (error.message.includes('Invalid email')) {
         errorMessage = 'Please enter a valid email address';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
       console.log('Showing error to user:', errorMessage);
