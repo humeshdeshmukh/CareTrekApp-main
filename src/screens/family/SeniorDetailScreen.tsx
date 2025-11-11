@@ -102,63 +102,19 @@ const SeniorDetailScreen = () => {
   const { translatedText: errorLoadingText } = useCachedTranslation('Error loading senior details', currentLanguage);
   const { translatedText: retryText } = useCachedTranslation('Retry', currentLanguage);
 
-  // Mock data - replace with actual API call
   useEffect(() => {
     const fetchSeniorDetails = async () => {
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // TODO: Implement actual API call to fetch senior details
+        // Example:
+        // const response = await api.get(`/api/seniors/${route.params.seniorId}`);
+        // setSenior(response.data);
         
-        // Define the mock data for each senior with proper typing
-        type SeniorStatus = 'online' | 'offline' | 'alert';
-        interface SeniorData {
-          name: string;
-          status: SeniorStatus;
-          lastActive: string;
-          avatar: string;
-          heartRate: number;
-          oxygen: number;
-          steps: number;
-          battery: number;
-          location: string;
-        }
-
-        const seniorsData: Record<string, SeniorData> = {
-          '1': {
-            name: 'Bhushan Mahant',
-            status: 'online',
-            lastActive: '10 min ago',
-            avatar: '',
-            heartRate: 68,
-            oxygen: 97,
-            steps: 5234,
-            battery: 92,
-            location: '789 Pine Rd, Anytown, USA',
-          },
-          '2': {
-            name: 'Aditi Lanjewar',
-            status: 'offline',
-            lastActive: '1 hour ago',
-            avatar: '',
-            heartRate: 75,
-            oxygen: 96,
-            steps: 2890,
-            battery: 23,
-            location: '321 Maple Dr, Somewhere, USA',
-          }
-        };
-
-        // Get the senior data based on the ID, or use the first senior as default
-        const seniorData = seniorsData[route.params.seniorId] || Object.values(seniorsData)[0];
-        
-        const mockData = {
-          id: route.params.seniorId,
-          ...seniorData
-        };
-        
-        setSenior(mockData);
+        // For now, set to null to indicate no data
+        setSenior(null);
       } catch (error) {
         console.error('Error fetching senior details:', error);
+        // Optionally show error to user
       } finally {
         setLoading(false);
       }
@@ -167,19 +123,15 @@ const SeniorDetailScreen = () => {
     fetchSeniorDetails();
   }, [route.params.seniorId]);
 
+  // Initialize with empty arrays that will be populated when data is available
   const healthMetrics: HealthMetric[] = [
-    { id: '1', type: 'heart', value: senior?.heartRate.toString() || '--', label: bpmText, unit: 'BPM', trend: 'down', status: senior?.heartRate && senior.heartRate > 90 ? 'warning' : 'normal' },
-    { id: '2', type: 'oxygen', value: senior?.oxygen.toString() || '--', label: spo2Text, unit: '%', trend: 'up', status: senior?.oxygen && senior.oxygen < 95 ? 'warning' : 'normal' },
-    { id: '3', type: 'steps', value: senior?.steps.toLocaleString() || '0', label: stepsText, trend: 'up' },
-    { id: '4', type: 'battery', value: senior?.battery.toString() || '--', label: batteryText, unit: '%', status: senior?.battery && senior.battery < 20 ? 'warning' : 'normal' },
+    { id: '1', type: 'heart', value: '--', label: bpmText, unit: 'BPM', trend: 'neutral', status: 'normal' },
+    { id: '2', type: 'oxygen', value: '--', label: spo2Text, unit: '%', trend: 'neutral', status: 'normal' },
+    { id: '3', type: 'steps', value: '0', label: stepsText, trend: 'neutral' },
+    { id: '4', type: 'battery', value: '--', label: batteryText, unit: '%', status: 'normal' },
   ];
 
-  const recentActivity: Activity[] = [
-    { id: '1', type: 'walk', title: 'Morning Walk', time: '2 hours ago', details: '1.2 km • 15 min', icon: 'walk' },
-    { id: '2', type: 'medication', title: 'Medication Taken', time: '4 hours ago', details: 'Lisinopril 10mg', icon: 'medical-bag' },
-    { id: '3', type: 'alert', title: 'High Heart Rate', time: '6 hours ago', details: '102 BPM', icon: 'heart-pulse' },
-    { id: '4', type: 'location', title: 'Location Updated', time: '8 hours ago', details: '123 Main St', icon: 'map-marker' },
-  ];
+  const recentActivity: Activity[] = []; // Empty array until API is implemented
 
   const handleCall = () => {
     if (!senior) return;

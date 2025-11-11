@@ -8,18 +8,22 @@ import {
   SafeAreaView, 
   Image, 
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Alert
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
+import { supabase } from '../../lib/supabase';
 
-type RootStackParamList = {
+export type RootStackParamList = {
   SeniorDetail: { seniorId: string };
   ConnectSenior: undefined;
+  Seniors: { refresh?: boolean };
+  // Add other screens as needed
 };
 
 type Senior = {
@@ -27,19 +31,49 @@ type Senior = {
   name: string;
   status: 'online' | 'offline' | 'alert';
   lastActive: string;
-  avatar: string;
+  avatar_url?: string;
   heartRate?: number;
   oxygen?: number;
   steps?: number;
+  email?: string;
+  phone?: string;
+};
+
+type UserProfile = {
+  id: string;
+  full_name?: string;
+  avatar_url?: string;
+  phone_number?: string;
+};
+
+type SeniorData = {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  user_profiles: UserProfile[];
+};
+
+type FamilyRelationship = {
+  id: string;
+  status: string;
+  created_at: string;
+  senior: SeniorData;
 };
 
 const SeniorsListScreen = () => {
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'Seniors'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'Seniors'>>();
   const { isDark } = useTheme();
   const { currentLanguage } = useTranslation();
   const [seniors, setSeniors] = useState<Senior[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Handle pull-to-refresh
+  const onRefresh = React.useCallback(() => {
+    fetchConnectedSeniors(true);
+  }, []);
 
   // Translations
   const { translatedText: mySeniorsText } = useCachedTranslation('My Seniors', currentLanguage);
@@ -51,46 +85,107 @@ const SeniorsListScreen = () => {
   const { translatedText: noSeniorsText } = useCachedTranslation('No seniors connected yet', currentLanguage);
   const { translatedText: connectNowText } = useCachedTranslation('Connect now', currentLanguage);
 
-  // Mock data - replace with actual API call
-  const fetchSeniors = async () => {
-    setRefreshing(true);
+  const fetchConnectedSeniors = async (forceRefresh: boolean = false) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockData: Senior[] = [
-        {
-          id: '1',
-          name: 'Bhushan Mahant',
-          status: 'online',
-          lastActive: '2 min ago',
-          avatar: 'https://randomuser.me/api/portraits/men/42.jpg',
-          heartRate: 75,
-          oxygen: 97,
-          steps: 4280
-        },
-        {
-          id: '2',
-          name: 'Aditi Lanjewar',
-          status: 'alert',
-          lastActive: '5 min ago',
-          avatar: 'https://randomuser.me/api/portraits/women/42.jpg',
-          heartRate: 88,
-          oxygen: 95,
-          steps: 3560
-        },
-      ];
-      setSeniors(mockData);
+      if (forceRefresh) {
+        setRefreshing(true);
+      } else if (!seniors.length) {
+        setLoading(true);
+      }
+
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error(userError?.message || 'User not authenticated');
+      }
+
+      console.log('Fetching connected seniors for user:', user.id);
+
+      // First, get all relationships for the current user
+      const { data: relationships, error: relError } = await supabase
+        .from('family_relationships')
+        .select('*')
+        .eq('family_member_id', user.id);
+
+      if (relError) throw relError;
+
+      console.log('Found relationships:', relationships);
+
+      if (!relationships || relationships.length === 0) {
+        console.log('No relationships found');
+        setSeniors([]);
+        return;
+      }
+
+      // Get all senior IDs from relationships
+      const seniorIds = relationships.map(rel => rel.senior_user_id).filter(Boolean);
+      
+      if (seniorIds.length === 0) {
+        console.log('No senior IDs found in relationships');
+        setSeniors([]);
+        return;
+      }
+
+      console.log('Fetching seniors with IDs:', seniorIds);
+
+      // Get all seniors in one query
+      const { data: seniorsData, error: seniorsError } = await supabase
+        .from('seniors')
+        .select(`
+          *,
+          user_profiles (
+            avatar_url,
+            phone_number
+          )
+        `)
+        .in('id', seniorIds);
+
+      if (seniorsError) throw seniorsError;
+
+      console.log('Fetched seniors:', seniorsData);
+
+      // Transform the data
+      const connectedSeniors = seniorsData.map((senior: any) => {
+        const profile = senior.user_profiles?.[0] || {};
+        const relationship = relationships.find((r: any) => r.senior_user_id === senior.id);
+        
+        return {
+          id: senior.id,
+          name: senior.name || `Senior ${senior.id.substring(0, 6)}`,
+          status: (relationship?.status || 'offline') as 'online' | 'offline' | 'alert',
+          lastActive: relationship?.created_at 
+            ? new Date(relationship.created_at).toLocaleString() 
+            : 'Unknown',
+          avatar_url: profile.avatar_url,
+          email: senior.email,
+          phone: senior.phone || profile.phone_number,
+        } as Senior;
+      });
+
+      console.log('Transformed seniors:', connectedSeniors);
+      setSeniors(connectedSeniors);
     } catch (error) {
-      console.error('Error fetching seniors:', error);
+      console.error('Error in fetchConnectedSeniors:', error);
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to load connected seniors. Please try again.'
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchSeniors();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchConnectedSeniors(!!route.params?.refresh);
+      
+      // Clear refresh param after handling
+      if (route.params?.refresh) {
+        navigation.setParams({ refresh: false });
+      }
+    }, [route.params?.refresh, navigation])
+  );
 
   const renderStatusBadge = (status: Senior['status']) => {
     const statusConfig = {
@@ -116,10 +211,11 @@ const SeniorsListScreen = () => {
       style={[styles.seniorCard, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}
       onPress={() => navigation.navigate('SeniorDetail', { seniorId: item.id })}
     >
-      {item.avatar ? (
+      {item.avatar_url ? (
         <Image 
-          source={{ uri: item.avatar }} 
-          style={styles.avatar} 
+          source={{ uri: item.avatar_url }} 
+          style={styles.avatar}
+          resizeMode="cover"
         />
       ) : (
         <View style={[styles.avatar, { backgroundColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center' }]}>
@@ -196,7 +292,7 @@ const SeniorsListScreen = () => {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={fetchSeniors}
+              onRefresh={onRefresh}
               colors={[isDark ? '#48BB78' : '#2F855A']}
               tintColor={isDark ? '#48BB78' : '#2F855A'}
             />

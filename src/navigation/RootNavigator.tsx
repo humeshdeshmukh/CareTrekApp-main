@@ -26,7 +26,7 @@ import SOSContactsScreen from '../screens/Senior/SOSContactsScreen';
 
 // Import family screens
 import HomeScreenFamily from '../screens/family/HomeScreenFamily';
-import NewConnectSeniorScreen from '../screens/family/NewConnectSeniorScreen';
+import AddSeniorScreen from '../screens/family/AddSeniorScreen';
 import SeniorDetailScreen from '../screens/family/SeniorDetailScreen';
 import AlertsScreen from '../screens/family/AlertsScreen';
 import MessagesScreen from '../screens/family/MessagesScreen';
@@ -327,10 +327,10 @@ const RootNavigator = () => {
       
       <Stack.Screen 
         name="ConnectSenior" 
-        component={NewConnectSeniorScreen}
+        component={AddSeniorScreen}
         options={{
           headerShown: true,
-          title: 'Connect Senior'
+          title: 'Add Senior'
         }}
       />
       

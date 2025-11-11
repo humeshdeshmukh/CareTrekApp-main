@@ -29,17 +29,15 @@ import SeniorDetailScreen from '../screens/family/SeniorDetailScreen';
 import AlertsScreen from '../screens/family/AlertsScreen';
 import MessagesScreen from '../screens/family/MessagesScreen';
 import FamilySettingsScreen from '../screens/family/FamilySettingsScreen';
-import NewConnectSeniorScreen from '../screens/family/NewConnectSeniorScreen';
 import HealthHistoryScreen from '../screens/family/HealthHistoryScreen';
-import ShareIdScreen from '../screens/family/ShareIdScreen';
-import AddFamilyKeyScreen from '../screens/family/AddFamilyKeyScreen';
+import AddSeniorScreen from '../screens/family/AddSeniorScreen';
 
 // Type definitions for tab navigation
 type FamilyTabParamList = {
-  Home: undefined;
+  HomeTab: undefined;
   Seniors: { refresh?: boolean };
   Alerts: undefined;
-  Messages: undefined;
+  MessagesTab: undefined;
   Settings: undefined;
 };
 
@@ -48,37 +46,30 @@ type FamilyStackParamList = {
   // Tabs
   MainTabs: undefined;
   
-  // Main Screens
-  Home: undefined;
-  Seniors: { refresh?: boolean };
-  SeniorDetail: { 
-    seniorId: string; 
-    seniorName?: string; 
-    seniorAvatar?: string; 
-    status?: 'online' | 'offline' | 'alert' 
-  };
-  ConnectSenior: undefined;
-  Alerts: undefined;
-  Messages: { 
-    seniorId: string; 
-    seniorName?: string; 
-    seniorAvatar?: string; 
-    status?: 'online' | 'offline' | 'alert' 
-  };
-  Settings: undefined;
-  
-  // Family Key Management
-  ShareId: undefined;
-  AddFamilyKey: undefined;
-  
-  // Other family screens
-  SeniorDetailScreen: { seniorId: string };
+  // Screens
+  SeniorDetail: { seniorId: string };
   NewConnectSenior: undefined;
-  FamilySettings: undefined;
   HealthHistory: { seniorId: string };
+  HomeNew: undefined;
+  AddSenior: undefined;
   
-  // Auth
-  Logout: undefined;
+  // Modals
+  FilterAlerts: undefined;
+  FilterMessages: undefined;
+  SortSeniors: undefined;
+  SortAlerts: undefined;
+  SortMessages: undefined;
+  
+  // Other
+  Settings: undefined;
+  EditProfile: undefined;
+  ChangePassword: undefined;
+  NotificationSettings: undefined;
+  PrivacyPolicy: undefined;
+  TermsOfService: undefined;
+  HelpCenter: undefined;
+  ContactSupport: undefined;
+  About: undefined;
 };
 
 const Tab = createBottomTabNavigator<FamilyTabParamList>();
@@ -153,7 +144,7 @@ const TabNavigator = () => {
       }}
     >
       <Tab.Screen
-        name="Home"
+        name="HomeTab"
         component={HomeScreenFamily}
         options={{
           tabBarIcon: ({ color, size }) => (
@@ -183,7 +174,7 @@ const TabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Messages"
+        name="MessagesTab"
         component={MessagesScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
@@ -236,14 +227,26 @@ export const FamilyNavigator = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen 
+        name="HomeNew" 
+        component={HomeScreenFamily} 
+        options={{
+          headerShown: false,
+          cardStyleInterpolator: CardStyleInterpolators.forFadeFromBottomAndroid,
+        }}
+      />
+      <Stack.Screen 
+        name="AddSenior" 
+        component={AddSeniorScreen} 
+        options={{
+          title: t('Add Senior'),
+          headerShown: false,
+          cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+        }}
+      />
+      <Stack.Screen 
         name="SeniorDetail" 
         component={SeniorDetailScreen} 
         options={{ title: t('Senior Details') || 'Senior Details' }}
-      />
-      <Stack.Screen 
-        name="ConnectSenior" 
-        component={NewConnectSeniorScreen} 
-        options={{ title: t('Connect Senior') || 'Connect Senior' }}
       />
       <Stack.Screen 
         name="HealthHistory" 
@@ -251,17 +254,7 @@ export const FamilyNavigator = () => {
         options={{ title: t('Health History') || 'Health History' }}
       />
       <Stack.Screen 
-        name="ShareId" 
-        component={ShareIdScreen} 
-        options={{ title: t('Share ID') || 'Share ID' }}
-      />
-      <Stack.Screen 
-        name="AddFamilyKey" 
-        component={AddFamilyKeyScreen} 
-        options={{ title: t('Add Family Member') || 'Add Family Member' }}
-      />
-      <Stack.Screen 
-        name="FamilySettings" 
+        name="Settings" 
         component={FamilySettingsScreen} 
         options={{ 
           title: t('Settings') || 'Settings',
@@ -271,10 +264,10 @@ export const FamilyNavigator = () => {
       <Stack.Screen 
         name="Messages" 
         component={MessagesScreen} 
-        options={({ route }) => ({ 
-          title: route.params?.seniorName || t('Messages') || 'Messages',
+        options={{ 
+          title: t('Messages') || 'Messages',
           headerShown: true,
-        })} 
+        }} 
       />
     </Stack.Navigator>
   );
