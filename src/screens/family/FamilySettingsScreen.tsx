@@ -11,8 +11,11 @@ import {
   Platform,
   Image
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../navigation/RootNavigator';
+import { useDispatch } from 'react-redux';
+import { setUser, clearError } from '../../store/slices/authSlice';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -72,7 +75,37 @@ const FamilySettingsScreen = () => {
   const { translatedText: cancelText } = useCachedTranslation('Cancel', currentLanguage);
   const { translatedText: confirmText } = useCachedTranslation('Confirm', currentLanguage);
 
+    const dispatch = useDispatch();
+
   const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Clear user data from Redux
+      dispatch(setUser(null));
+      dispatch(clearError());
+      
+      // Navigate to RoleSelection screen
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'RoleSelection' }],
+        })
+      );
+    } catch (error) {
+      console.error('Error signing out:', error);
+      // Even if there's an error, we'll still try to reset the auth state and navigation
+      dispatch(setUser(null));
+      dispatch(clearError());
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'RoleSelection' }],
+        })
+      );
+    }
+  };
+
+  const confirmSignOut = () => {
     Alert.alert(
       signOutText,
       signOutConfirmationText,
@@ -83,19 +116,7 @@ const FamilySettingsScreen = () => {
         },
         {
           text: confirmText,
-          onPress: async () => {
-            try {
-              await signOut();
-              // Navigate to auth stack after successful sign out
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Auth' }],
-              });
-            } catch (error) {
-              console.error('Error signing out:', error);
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
-            }
-          },
+          onPress: handleSignOut,
           style: 'destructive',
         },
       ],
@@ -341,13 +362,13 @@ const FamilySettingsScreen = () => {
 
         {/* Sign Out Button */}
         <TouchableOpacity 
+          onPress={confirmSignOut}
           style={[styles.signOutButton, { 
-            backgroundColor: isDark ? '#2D3748' : '#FFFFFF',
+            backgroundColor: isDark ? '#E53E3E' : '#FED7D7',
             borderTopWidth: 1,
             borderTopColor: isDark ? '#4A5568' : '#E2E8F0',
             marginTop: 20,
           }]}
-          onPress={handleSignOut}
         >
           <View style={styles.signOutContent}>
             <MaterialIcons 

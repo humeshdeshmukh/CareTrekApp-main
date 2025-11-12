@@ -79,12 +79,14 @@ const Stack = createStackNavigator<FamilyStackParamList>();
 const cardStyleInterpolator = CardStyleInterpolators.forHorizontalIOS;
 
 // Create a navigation reference that will be used by the app
-export let navigationRef: NavigationContainerRef<FamilyStackParamList> | null = null;
+export const navigationRef = React.createRef<NavigationContainerRef<FamilyStackParamList>>();
 
-// Helper function to navigate to any screen
+// Helper function to safely navigate to any screen
 export function navigate(name: keyof FamilyStackParamList, params?: any) {
-  if (navigationRef?.isReady()) {
-    navigationRef.navigate(name as any, params);
+  if (navigationRef.current?.isReady()) {
+    navigationRef.current.navigate(name as any, params);
+  } else {
+    console.warn('Navigation reference is not ready yet');
   }
 }
 
@@ -202,8 +204,7 @@ export const FamilyNavigator = () => {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   
-  // Initialize the navigation ref
-  navigationRef = useNavigationContainerRef<FamilyStackParamList>();
+  // No need to reinitialize the ref, using the one created above
 
   return (
     <Stack.Navigator
@@ -213,6 +214,8 @@ export const FamilyNavigator = () => {
           elevation: 0,
           shadowOpacity: 0,
         },
+        // Add this to ensure navigation ref is properly set
+        navigationRef: navigationRef,
         headerTintColor: colors.primary,
         headerTitleStyle: {
           fontWeight: '600',
