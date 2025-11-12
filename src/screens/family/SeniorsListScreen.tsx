@@ -31,6 +31,7 @@ type Senior = {
   name: string;
   status: 'online' | 'offline' | 'alert';
   lastActive: string;
+  connectedAt: string; // Added connection time
   avatar_url?: string;
   heartRate?: number;
   oxygen?: number;
@@ -147,13 +148,16 @@ const SeniorsListScreen = () => {
           // Create a placeholder email using the user ID if needed
           const email = `${rel.senior_user_id}@caretrek.app`;
           
+          const connectedAt = rel.created_at 
+            ? new Date(rel.created_at).toLocaleString() 
+            : 'Unknown';
+            
           return {
             id: rel.senior_user_id,
             name: profile?.full_name || `Senior ${rel.senior_user_id.substring(0, 6)}`,
             status: (rel.status || 'offline') as 'online' | 'offline' | 'alert',
-            lastActive: rel.created_at 
-              ? new Date(rel.created_at).toLocaleString() 
-              : 'Unknown',
+            lastActive: 'Recently', // You can update this with actual last active time if available
+            connectedAt: connectedAt,
             avatar_url: profile?.avatar_url,
             email: email,
             phone: undefined, // Phone not available in the current schema
@@ -228,9 +232,14 @@ const SeniorsListScreen = () => {
           </Text>
           {renderStatusBadge(item.status)}
         </View>
-        <Text style={[styles.lastSeen, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-          {`${lastSeenText} ${item.lastActive}`}
-        </Text>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+            {`${lastSeenText} ${item.lastActive}`}
+          </Text>
+          <Text style={[styles.infoText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+            {`Connected: ${item.connectedAt}`}
+          </Text>
+        </View>
         <View style={styles.metricsContainer}>
           {item.heartRate !== undefined && (
             <View style={styles.metricItem}>
@@ -413,9 +422,20 @@ const styles = StyleSheet.create({
     color: '#718096',
     marginBottom: 8,
   },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 4,
+  },
+  infoText: {
+    fontSize: 12,
+    marginTop: 2,
+  },
   metricsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: 8,
+    flexWrap: 'wrap',
   },
   metricItem: {
     flexDirection: 'row',
