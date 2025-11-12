@@ -15,7 +15,8 @@ import {
   Animated,
   TouchableWithoutFeedback,
   Keyboard,
-  TextInput
+  TextInput,
+  Linking
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../contexts/theme/ThemeContext';

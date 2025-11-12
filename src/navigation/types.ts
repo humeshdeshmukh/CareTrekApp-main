@@ -7,8 +7,8 @@ export type SignUpParams = {
   phoneNumber?: string;
 };
 
+// Authentication Stack
 export type AuthStackParamList = {
-  // Authentication Flow
   Welcome: undefined;
   FamilySignIn: { email?: string };
   SeniorAuth: { role?: UserRole };
@@ -25,28 +25,43 @@ export type AuthStackParamList = {
   EditProfile: undefined;
 };
 
+// Family Stack
+export type FamilyTabParamList = {
+  HomeTab: undefined;
+  Seniors: { refresh?: boolean };
+  Alerts: undefined;
+  MessagesTab: undefined;
+  Settings: undefined;
+};
+
 export type FamilyStackParamList = {
-  // Family Home
-  FamilyHome: undefined;
+  // Tabs
+  MainTabs: undefined;
   
-  // Family Features
-  ShareId: undefined;
-  AddFamilyKey: undefined;
-  FamilyProfile: { userId: string };
-  FamilySettings: undefined;
-  
-  // Senior Management
-  SeniorList: undefined;
-  SeniorDetails: { seniorId: string };
+  // Screens
+  SeniorDetail: { seniorId: string };
+  NewConnectSenior: undefined;
+  HealthHistory: { seniorId: string };
+  HomeNew: undefined;
   AddSenior: undefined;
   
-  // Alerts & Notifications
-  Alerts: undefined;
-  AlertDetails: { alertId: string };
+  // Modals
+  FilterAlerts: undefined;
+  FilterMessages: undefined;
+  SortSeniors: undefined;
+  SortAlerts: undefined;
+  SortMessages: undefined;
   
-  // Messages
-  Messages: undefined;
-  Chat: { recipientId: string };
+  // Settings
+  Settings: undefined;
+  EditProfile: undefined;
+  ChangePassword: undefined;
+  NotificationSettings: undefined;
+  PrivacyPolicy: undefined;
+  TermsOfService: undefined;
+  HelpCenter: undefined;
+  ContactSupport: undefined;
+  About: undefined;
 };
 
 export type SeniorStackParamList = {
@@ -70,29 +85,62 @@ export type SeniorStackParamList = {
 
 export type RootStackParamList = {
   // Auth Stack
-  Auth: undefined;
-  
-  // Main App Tabs
+  Welcome: undefined;
+  RoleSelection: undefined;
+  FamilySignIn: { email?: string };
+  SeniorAuth: { role?: UserRole };
+  SignIn: { role?: UserRole };
+  SignUp: SignUpParams;
+  ForgotPassword: { email?: string };
+  OTPVerification: { 
+    phoneNumber: string;
+    verificationId: string;
+    role: UserRole;
+    isSignUp?: boolean;
+  };
+  Emergency: { role: UserRole };
+  EditProfile: undefined;
+
+  // Family Stack
   MainTabs: undefined;
+  SeniorDetail: { seniorId: string };
+  NewConnectSenior: undefined;
+  HealthHistory: { seniorId: string };
+  HomeNew: undefined;
+  AddSenior: undefined;
   
-  // Shared Screens
+  // Modals
+  FilterAlerts: undefined;
+  FilterMessages: undefined;
+  SortSeniors: undefined;
+  SortAlerts: undefined;
+  SortMessages: undefined;
+  
+  // Settings
+  Settings: undefined;
+  ChangePassword: undefined;
+  NotificationSettings: undefined;
+  PrivacyPolicy: undefined;
+  TermsOfService: undefined;
+  HelpCenter: undefined;
+  ContactSupport: undefined;
+  About: undefined;
+  
+  // Senior Stack
+  SeniorHome: undefined;
+  SeniorDashboard: undefined;
+  MedicationReminders: undefined;
+  EmergencyContacts: undefined;
+  SeniorProfile: undefined;
+  
+  // Common
   WebView: { url: string; title: string };
-  
-  // Common Screens
   Loading: undefined;
   NotFound: undefined;
-  
-  // Modal Screens
   ImageViewer: { uri: string };
-  
-  // Onboarding
   Onboarding: undefined;
-  
-  // Deep Linking
   DeepLink: { url: string };
-} & AuthStackParamList & 
-   Omit<FamilyStackParamList, keyof AuthStackParamList> & 
-   Omit<SeniorStackParamList, keyof AuthStackParamList | keyof FamilyStackParamList>;
+};
 
 // Helper types for navigation props
 export type ScreenProps<T extends keyof RootStackParamList> = {

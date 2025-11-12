@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Text } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useTheme } from '../contexts/theme/ThemeContext';
-import Svg, { G, Path, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { G, Path, Circle } from 'react-native-svg';
 
-type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Splash'>;
+type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Welcome'>;
 
 interface SplashScreenProps {
   navigation: SplashScreenNavigationProp;
@@ -13,15 +13,22 @@ interface SplashScreenProps {
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   const { isDark } = useTheme();
-  const fadeAnim = new Animated.Value(0);
-  const scaleAnim = new Animated.Value(0.9);
-  const pulseAnim = new Animated.Value(1);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const { width } = Dimensions.get('window');
   const logoSize = width * 0.7;
-
+  
+  // Theme colors
+  const backgroundColor = isDark ? '#1A202C' : '#FFFFFF';
+  const textColor = isDark ? '#E2E8F0' : '#1A202C';
+  const mutedColor = isDark ? '#A0AEC0' : '#718096';
+  const primaryColor = isDark ? '#63B3ED' : '#2B6CB0';
+  
+  // Start animations when component mounts
   useEffect(() => {
     // Fade in and scale up animation
-    Animated.parallel([
+    const fadeIn = Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 1000,
@@ -33,13 +40,13 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         tension: 30,
         useNativeDriver: true,
       })
-    ]).start();
+    ]);
 
-    // Pulsing animation
-    Animated.loop(
+    // Pulse animation for the heart
+    const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.05,
+          toValue: 0.7,
           duration: 1000,
           useNativeDriver: true,
         }),
@@ -47,52 +54,47 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           toValue: 1,
           duration: 1000,
           useNativeDriver: true,
-        })
+        }),
       ])
-    ).start();
+    );
 
-    // Navigate to Onboarding after 3 seconds
+    // Start animations
+    fadeIn.start();
+    pulse.start();
+    
+    // Navigate to Welcome screen after 3 seconds
     const timer = setTimeout(() => {
-      navigation.replace('Onboarding');
+      navigation.navigate('Welcome');
     }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [navigation, fadeAnim, scaleAnim, pulseAnim]);
-
-  const bgColor = isDark ? '#171923' : '#FFFBEF';
-  const textColor = isDark ? '#E2E8F0' : '#2D3748';
-  const accentColor = isDark ? '#48BB78' : '#2F855A';
-  const mutedColor = isDark ? '#718096' : '#A0AEC0';
-
+    
+    // Cleanup function
+    return () => {
+      fadeIn.stop();
+      pulse.stop();
+      clearTimeout(timer);
+    };
+  }, [fadeAnim, scaleAnim, pulseAnim, navigation]);
+  
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
+    <View style={[styles.container, { backgroundColor }]}>
       <Animated.View 
         style={[
           styles.logoContainer,
           { 
             opacity: fadeAnim,
             transform: [
-              { scale: Animated.multiply(scaleAnim, pulseAnim) },
+              { scale: scaleAnim },
             ]
           }
         ]}
       >
         <Svg width={logoSize} height={logoSize} viewBox="0 0 300 300">
-          {/* Background Circle with Gradient */}
+          {/* Background Circle */}
           <Circle 
             cx="150" 
             cy="150" 
-            r="130" 
-            fill={accentColor} 
-            opacity={isDark ? 0.9 : 0.95}
-          />
-          
-          {/* Inner Circle */}
-          <Circle 
-            cx="150" 
-            cy="130" 
-            r="80" 
-            fill="white" 
+            r="140" 
+            fill={primaryColor}
             fillOpacity={isDark ? 0.2 : 0.9} 
           />
           
@@ -103,21 +105,25 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           </G>
           
           {/* Heart Pulse Effect */}
-          <Path 
-            d="M150 220C160 210 180 190 190 170C200 150 190 130 170 120C160 115 150 120 145 125C140 120 130 115 120 120C100 130 90 150 100 170C110 190 130 210 140 220" 
-            fill="none" 
-            stroke="white" 
-            strokeWidth="8" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <Animate 
-              attributeName="opacity" 
-              values="0.7;1;0.7" 
-              dur="2s" 
-              repeatCount="indefinite" 
+          <Animated.View style={{
+            opacity: pulseAnim,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <Path 
+              d="M150 220C160 210 180 190 190 170C200 150 190 130 170 120C160 115 150 120 145 125C140 120 130 115 120 120C100 130 90 150 100 170C110 190 130 210 140 220" 
+              fill="none" 
+              stroke="white" 
+              strokeWidth="8" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
             />
-          </Path>
+          </Animated.View>
         </Svg>
         
         <Animated.Text style={[
@@ -128,8 +134,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
             marginTop: 20,
           }
         ]}>
-          <Text style={{ fontFamily: 'Inter_300Light' }}>CARE</Text>
-          <Text style={{ fontFamily: 'Inter_700Bold' }}>TREK</Text>
+          CareTrek
         </Animated.Text>
         
         <Animated.Text style={[
@@ -141,6 +146,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         ]}>
           Bridging Generations
         </Animated.Text>
+      </Animated.View>
     </View>
   );
 };
@@ -154,20 +160,16 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
   },
   appName: {
-    fontSize: 36,
-    marginTop: 30,
-    letterSpacing: 2,
-    textAlign: 'center',
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginTop: 20,
   },
   tagline: {
-    fontSize: 14,
-    marginTop: 8,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    fontFamily: 'Inter_300Light',
+    fontSize: 16,
+    marginTop: 10,
+    opacity: 0.8,
   },
 });
 

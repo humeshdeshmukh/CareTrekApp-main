@@ -8,6 +8,7 @@ export type UserRole = 'senior' | 'family' | 'guest';
 
 // Extend the User type from Supabase
 interface AppUser extends User {
+  id: string;
   role: UserRole;
   displayName: string | null;
   phoneNumber: string | null;
@@ -18,6 +19,7 @@ interface AppUser extends User {
 // Auth context type
 interface AuthContextType {
   user: AppUser | null;
+  userRole: UserRole | null;
   session: Session | null;
   isLoading: boolean;
   error: string | null;
@@ -27,11 +29,13 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ user: AppUser | null; session: Session | null }>;
   signUp: (email: string, password: string, displayName: string, role: UserRole) => Promise<{ user: AppUser | null; session: Session | null }>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updateProfile: (updates: { displayName?: string; photoURL?: string }) => Promise<void>;
   signInWithPhone: (phoneNumber: string) => Promise<{ error: Error | null }>;
   verifyOtp: (phoneNumber: string, token: string) => Promise<{ session: Session | null; user: AppUser | null; error: Error | null }>;
   guestSignIn: () => Promise<void>;
+  checkAuthState: () => Promise<void>;
 }
 
 // Create the auth context
@@ -49,46 +53,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  // Check authentication state
+  const checkAuthState = async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (currentSession?.user) {
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentSession.user.id)
+          .single();
+
+        if (userError) throw userError;
+
+        setSession(currentSession);
+        setUser({
+          ...currentSession.user,
+          role: userData?.role || 'guest',
+          displayName: userData?.display_name || null,
+          phoneNumber: userData?.phone_number || null,
+          photoURL: userData?.avatar_url || null,
+          isAnonymous: false,
+        } as AppUser);
+      } else {
+        setSession(null);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Error checking auth state:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Check for existing session on mount
   useEffect(() => {
-    // Check active sessions and set the user
-    const getInitialSession = async () => {
-      try {
-        setIsLoading(true);
-        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          throw sessionError;
-        }
-
-        if (currentSession?.user) {
-          const { data: userData, error: userError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', currentSession.user.id)
-            .single();
-
-          if (userError) throw userError;
-
-          setSession(currentSession);
-          setUser({
-            ...currentSession.user,
-            role: userData?.role || 'guest',
-            displayName: userData?.display_name || null,
-            phoneNumber: userData?.phone_number || null,
-            photoURL: userData?.avatar_url || null,
-            isAnonymous: false,
-          } as AppUser);
-        }
-      } catch (error) {
-        console.error('Error getting initial session:', error);
-        setError(error instanceof Error ? error.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    getInitialSession();
+    checkAuthState();
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -337,7 +345,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) throw error;
 
-      if (data.session?.user) {
+      if (data.session?.user && data.user) {
         // Check if user exists in profiles
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -418,9 +426,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Delete user account
+  const deleteAccount = async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      if (!user) {
+        throw new Error('No user is currently signed in');
+      }
+
+      // Delete user data from the database first
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      // Then delete the auth user
+      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+      
+      if (authError) {
+        throw authError;
+      }
+
+      // Sign out the user
+      await signOut();
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete account');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Context value
   const value = {
     user,
+    userRole: user?.role || null,
     session,
     isLoading,
     error,
@@ -430,11 +477,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signIn,
     signUp,
     signOut,
+    deleteAccount,
     resetPassword,
     updateProfile,
     signInWithPhone,
     verifyOtp,
     guestSignIn,
+    checkAuthState,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

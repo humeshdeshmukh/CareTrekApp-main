@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -70,7 +70,7 @@ const MapScreen: React.FC = () => {
   const { translatedText: backText } = useCachedTranslation('Back', currentLanguage);
   const { translatedText: sosText } = useCachedTranslation('SOS', currentLanguage);
 
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<MapView>(null);
 
   // Map & UI
   const [region, setRegion] = useState<Region>(DEFAULT_REGION);
@@ -664,7 +664,7 @@ const MapScreen: React.FC = () => {
       {/* Map */}
       <View style={styles.mapContainer}>
         <MapView
-          ref={(r) => (mapRef.current = r)}
+          ref={mapRef}
           style={styles.map}
           initialRegion={DEFAULT_REGION}
           showsUserLocation

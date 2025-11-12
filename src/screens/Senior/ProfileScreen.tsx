@@ -11,8 +11,8 @@ import {
   Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/theme/ThemeContext';
+import { useAuth } from '../../contexts/auth/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -128,7 +128,7 @@ const ProfileScreen: React.FC = () => {
     {
       icon: 'identifier',
       label: 'User ID',
-      value: user?.uid ? user.uid : 'Not available',
+      value: user?.id ? user.id : 'Not available',
       copyable: true,
       action: () => {},
     },

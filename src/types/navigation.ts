@@ -4,6 +4,7 @@ export type SeniorTabParamList = {
   Health: undefined;
   Reminders: undefined;
   Profile: undefined;
+  SOSContacts: undefined;
 };
 
 export type FamilyTabParamList = {
@@ -33,5 +34,6 @@ export type RootStackParamList = {
   SeniorApp: undefined;
   FamilyApp: undefined;
   Auth: { screen: keyof AuthStackParamList };
+  SOSContacts: undefined;
   // Add other screens here
 };
