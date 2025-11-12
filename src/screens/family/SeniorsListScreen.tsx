@@ -104,7 +104,7 @@ const SeniorsListScreen = () => {
       // First, get all relationships for the current user
       const { data: relationships, error: relError } = await supabase
         .from('family_relationships')
-        .select('*')
+        .select('senior_user_id, created_at, status')
         .eq('family_member_id', user.id);
 
       if (relError) throw relError;
@@ -117,50 +117,49 @@ const SeniorsListScreen = () => {
         return;
       }
 
-      // Get all senior IDs from relationships
-      const seniorIds = relationships.map(rel => rel.senior_user_id).filter(Boolean);
+      // Get all senior user IDs
+      const seniorUserIds = relationships.map(rel => rel.senior_user_id).filter(Boolean);
       
-      if (seniorIds.length === 0) {
-        console.log('No senior IDs found in relationships');
+      if (seniorUserIds.length === 0) {
+        console.log('No senior user IDs found');
         setSeniors([]);
         return;
       }
 
-      console.log('Fetching seniors with IDs:', seniorIds);
+      // Get basic user profiles (only fields that definitely exist)
+      const { data: userProfiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', seniorUserIds);
 
-      // Get all seniors in one query
-      const { data: seniorsData, error: seniorsError } = await supabase
-        .from('seniors')
-        .select(`
-          *,
-          user_profiles (
-            avatar_url,
-            phone_number
-          )
-        `)
-        .in('id', seniorIds);
+      if (profilesError) {
+        console.error('Error fetching user profiles:', profilesError);
+        throw profilesError;
+      }
 
-      if (seniorsError) throw seniorsError;
-
-      console.log('Fetched seniors:', seniorsData);
+      console.log('Fetched user profiles:', userProfiles);
 
       // Transform the data
-      const connectedSeniors = seniorsData.map((senior: any) => {
-        const profile = senior.user_profiles?.[0] || {};
-        const relationship = relationships.find((r: any) => r.senior_user_id === senior.id);
-        
-        return {
-          id: senior.id,
-          name: senior.name || `Senior ${senior.id.substring(0, 6)}`,
-          status: (relationship?.status || 'offline') as 'online' | 'offline' | 'alert',
-          lastActive: relationship?.created_at 
-            ? new Date(relationship.created_at).toLocaleString() 
-            : 'Unknown',
-          avatar_url: profile.avatar_url,
-          email: senior.email,
-          phone: senior.phone || profile.phone_number,
-        } as Senior;
-      });
+      const connectedSeniors = relationships
+        .map(rel => {
+          const profile = userProfiles?.find(p => p.id === rel.senior_user_id);
+          
+          // Create a placeholder email using the user ID if needed
+          const email = `${rel.senior_user_id}@caretrek.app`;
+          
+          return {
+            id: rel.senior_user_id,
+            name: profile?.full_name || `Senior ${rel.senior_user_id.substring(0, 6)}`,
+            status: (rel.status || 'offline') as 'online' | 'offline' | 'alert',
+            lastActive: rel.created_at 
+              ? new Date(rel.created_at).toLocaleString() 
+              : 'Unknown',
+            avatar_url: profile?.avatar_url,
+            email: email,
+            phone: undefined, // Phone not available in the current schema
+          } as Senior;
+        })
+        .filter(senior => senior !== null); // Filter out any null entries
 
       console.log('Transformed seniors:', connectedSeniors);
       setSeniors(connectedSeniors);
