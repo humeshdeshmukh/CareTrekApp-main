@@ -16,7 +16,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/auth/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 
@@ -26,7 +26,7 @@ const SeniorAuthScreen: React.FC = () => {
   // permissive navigation typing to avoid TS errors if your root stack differs
   const navigation = useNavigation<SeniorAuthScreenNavigationProp & any>();
   const { colors } = useTheme();
-  const { signIn, loading, user } = useAuth();
+  const { signIn, isLoading, user } = useAuth();
 
   const [isSignIn, setIsSignIn] = useState(true);
   const [email, setEmail] = useState('');
@@ -125,7 +125,7 @@ const SeniorAuthScreen: React.FC = () => {
 
     try {
       if (isSignIn) {
-        await signIn(email, password, 'senior');
+        await signIn(email, password);
         // actual navigation occurs in the useEffect when `user` is set
         return;
       }
@@ -165,7 +165,7 @@ const SeniorAuthScreen: React.FC = () => {
               setPassword('');
               setConfirmPassword('');
               setName('');
-              setPhoneNumber('');
+              // setPhoneNumber(''); // Removed as it's not defined
               setIsSignIn(true);
             },
           },
@@ -227,7 +227,7 @@ const SeniorAuthScreen: React.FC = () => {
                     value={name}
                     onChangeText={setName}
                     autoCapitalize="words"
-                    editable={!loading}
+                    editable={!isLoading}
                     onBlur={() => validateField('name', name)}
                   />
                   {errors.name ? <Text style={[styles.errorText, { color: colors.error }]}>{errors.name}</Text> : null}
@@ -244,7 +244,7 @@ const SeniorAuthScreen: React.FC = () => {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
-                  editable={!loading}
+                  editable={!isLoading}
                   onBlur={() => validateField('email', email)}
                 />
                 {errors.email ? <Text style={[styles.errorText, { color: colors.error }]}>{errors.email}</Text> : null}
@@ -258,7 +258,7 @@ const SeniorAuthScreen: React.FC = () => {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
-                  editable={!loading}
+                  editable={!isLoading}
                   onBlur={() => validateField('password', password)}
                 />
                 {errors.password ? <Text style={[styles.errorText, { color: colors.error }]}>{errors.password}</Text> : null}
@@ -273,7 +273,7 @@ const SeniorAuthScreen: React.FC = () => {
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     secureTextEntry
-                    editable={!loading}
+                    editable={!isLoading}
                     onBlur={() => validateField('confirmPassword', confirmPassword)}
                   />
                   {errors.confirmPassword ? <Text style={[styles.errorText, { color: colors.error }]}>{errors.confirmPassword}</Text> : null}
@@ -281,7 +281,7 @@ const SeniorAuthScreen: React.FC = () => {
               )}
 
               {isSignIn && (
-                <TouchableOpacity style={[styles.forgotPasswordButton, { borderColor: colors.primary }]} onPress={handleForgotPassword} disabled={loading}>
+                <TouchableOpacity style={[styles.forgotPasswordButton, { borderColor: colors.primary }]} onPress={handleForgotPassword} disabled={isLoading}>
                   <Text style={{ color: colors.primary, fontWeight: '500' }}>Forgot Password?</Text>
                 </TouchableOpacity>
               )}
@@ -291,7 +291,7 @@ const SeniorAuthScreen: React.FC = () => {
                   styles.submitButton,
                   {
                     backgroundColor: colors.primary,
-                    opacity: loading ? 0.7 : 1,
+                    opacity: isLoading ? 0.7 : 1,
                     shadowColor: colors.primary,
                     elevation: 3,
                     shadowOffset: { width: 0, height: 2 },
@@ -300,10 +300,10 @@ const SeniorAuthScreen: React.FC = () => {
                   },
                 ]}
                 onPress={handleSubmit}
-                disabled={loading}
+                disabled={isLoading}
                 activeOpacity={0.8}
               >
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>{isSignIn ? 'Sign In' : 'Continue'}</Text>}
+                {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>{isSignIn ? 'Sign In' : 'Continue'}</Text>}
               </TouchableOpacity>
 
               <View style={styles.dividerContainer}>
@@ -312,7 +312,7 @@ const SeniorAuthScreen: React.FC = () => {
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
               </View>
 
-              <TouchableOpacity style={[styles.socialButton, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => {}} disabled={loading}>
+              <TouchableOpacity style={[styles.socialButton, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => {}} disabled={isLoading}>
                 <Icon name="google" size={20} color={colors.text} />
                 <Text style={[styles.socialButtonText, { color: colors.text }]}>{isSignIn ? 'Sign in with Google' : 'Continue with Google'}</Text>
               </TouchableOpacity>
@@ -320,7 +320,7 @@ const SeniorAuthScreen: React.FC = () => {
 
             <View style={[styles.footer, { borderTopColor: colors.border }]}>
               <Text style={{ color: colors.textSecondary }}>{isSignIn ? "Don't have an account? " : 'Already have an account? '}</Text>
-              <TouchableOpacity onPress={toggleAuthMode} disabled={loading}>
+              <TouchableOpacity onPress={toggleAuthMode} disabled={isLoading}>
                 <Text style={{ color: colors.primary, fontWeight: '600' }}>{isSignIn ? 'Sign Up' : 'Sign In'}</Text>
               </TouchableOpacity>
             </View>
