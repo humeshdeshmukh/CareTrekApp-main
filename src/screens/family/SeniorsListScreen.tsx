@@ -22,6 +22,7 @@ import { supabase } from '../../lib/supabase';
 export type RootStackParamList = {
   SeniorDetail: { seniorId: string };
   ConnectSenior: undefined;
+  AddSenior: { onSuccess?: () => void };
   Seniors: { refresh?: boolean };
   // Add other screens as needed
 };
@@ -38,6 +39,7 @@ type Senior = {
   steps?: number;
   email?: string;
   phone?: string;
+  relationship?: string; // Added relationship field
 };
 
 type UserProfile = {
@@ -70,11 +72,29 @@ const SeniorsListScreen = () => {
   const [seniors, setSeniors] = useState<Senior[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+  const [initialLoad, setInitialLoad] = useState(true);
+
   // Handle pull-to-refresh
   const onRefresh = React.useCallback(() => {
     fetchConnectedSeniors(true);
   }, []);
+
+  // Handle screen focus and refresh parameter
+  useFocusEffect(
+    React.useCallback(() => {
+      const refresh = route.params?.refresh || false;
+      if (refresh || initialLoad) {
+        fetchConnectedSeniors(true);
+        setInitialLoad(false);
+        // Clear the refresh param to prevent unnecessary refetches
+        navigation.setParams({ refresh: false });
+      }
+      
+      return () => {
+        // Cleanup if needed
+      };
+    }, [route.params?.refresh, initialLoad])
+  );
 
   // Translations
   const { translatedText: mySeniorsText } = useCachedTranslation('My Seniors', currentLanguage);
@@ -131,6 +151,24 @@ const SeniorsListScreen = () => {
         return;
       }
 
+      // Get relationship names from family_connections
+      const { data: connections, error: connError } = await supabase
+        .from('family_connections')
+        .select('senior_user_id, connection_name')
+        .in('senior_user_id', seniorUserIds)
+        .eq('family_user_id', user.id);
+
+      if (connError) {
+        console.error('Error fetching connections:', connError);
+        throw connError;
+      }
+
+      // Create a map of senior_user_id to connection_name
+      const connectionMap = new Map();
+      connections?.forEach(conn => {
+        connectionMap.set(conn.senior_user_id, conn.connection_name);
+      });
+
       // Get basic user profiles (only fields that definitely exist)
       const { data: userProfiles, error: profilesError } = await supabase
         .from('user_profiles')
@@ -165,6 +203,7 @@ const SeniorsListScreen = () => {
             avatar_url: profile?.avatar_url,
             email: email,
             phone: undefined, // Phone not available in the current schema
+            relationship: connectionMap.get(rel.senior_user_id) || 'Family Member',
           } as Senior;
         })
         .filter(senior => senior !== null); // Filter out any null entries
@@ -274,9 +313,16 @@ const SeniorsListScreen = () => {
       )}
       <View style={styles.seniorInfo}>
         <View style={styles.seniorHeader}>
-          <Text style={[styles.seniorName, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-            {item.name}
-          </Text>
+          <View>
+            <Text style={[styles.seniorName, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
+              {item.name}
+            </Text>
+            {item.relationship && (
+              <Text style={[styles.relationshipText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+                {item.relationship}
+              </Text>
+            )}
+          </View>
           {renderStatusBadge(item.status)}
         </View>
         <View style={styles.infoRow}>
@@ -382,7 +428,9 @@ const SeniorsListScreen = () => {
           </Text>
           <TouchableOpacity 
             style={[styles.addButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
-            onPress={() => navigation.navigate('ConnectSenior')}
+            onPress={() => navigation.navigate('AddSenior', { 
+              onSuccess: () => fetchConnectedSeniors(true) 
+            })}
           >
             <Ionicons 
               name="person-add" 
@@ -400,7 +448,9 @@ const SeniorsListScreen = () => {
       {seniors.length > 0 && (
         <TouchableOpacity 
           style={[styles.floatingButton, { backgroundColor: isDark ? '#2F855A' : '#38A169' }]}
-          onPress={() => navigation.navigate('ConnectSenior')}
+          onPress={() => navigation.navigate('AddSenior', { 
+            onSuccess: () => fetchConnectedSeniors(true) 
+          })}
         >
           <Ionicons name="person-add" size={24} color="white" />
         </TouchableOpacity>
@@ -463,6 +513,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#1A202C',
+    marginBottom: 2,
+  },
+  relationshipText: {
+    fontSize: 14,
+    color: '#718096',
   },
   statusBadge: {
     flexDirection: 'row',

@@ -16,6 +16,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
@@ -55,23 +56,28 @@ type Activity = {
   icon: string;
 };
 
+interface Senior {
+  id: string;
+  name: string;
+  status: 'online' | 'offline' | 'alert';
+  lastActive: string;
+  avatar: string;
+  heartRate: number;
+  oxygen: number;
+  steps: number;
+  battery: number;
+  location: string;
+  relationship?: string;
+  email?: string;
+  phone?: string;
+}
+
 const SeniorDetailScreen = () => {
   const route = useRoute<SeniorDetailRouteProp>();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { isDark } = useTheme();
   const { currentLanguage } = useTranslation();
-  const [senior, setSenior] = useState<{
-    id: string;
-    name: string;
-    status: 'online' | 'offline' | 'alert';
-    lastActive: string;
-    avatar: string;
-    heartRate: number;
-    oxygen: number;
-    steps: number;
-    battery: number;
-    location: string;
-  } | null>(null);
+  const [senior, setSenior] = useState<Senior | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'activity'>('overview');
@@ -105,22 +111,70 @@ const SeniorDetailScreen = () => {
   useEffect(() => {
     const fetchSeniorDetails = async () => {
       try {
-        // TODO: Implement actual API call to fetch senior details
-        // Example:
-        // const response = await api.get(`/api/seniors/${route.params.seniorId}`);
-        // setSenior(response.data);
+        setLoading(true);
         
-        // For now, set to null to indicate no data
-        setSenior(null);
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          throw new Error(userError?.message || 'User not authenticated');
+        }
+        
+        // Get senior details
+        const { data: seniorData, error: seniorError } = await supabase
+          .from('seniors')
+          .select('*')
+          .eq('id', route.params.seniorId)
+          .single();
+          
+        if (seniorError) throw seniorError;
+        
+        // Get relationship info
+        const { data: connectionData, error: connError } = await supabase
+          .from('family_connections')
+          .select('*')
+          .eq('senior_user_id', route.params.seniorId)
+          .eq('family_user_id', user.id)
+          .single();
+          
+        if (connError) console.error('Error fetching relationship:', connError);
+        
+        // Get user profile for avatar
+        const { data: profileData } = await supabase
+          .from('user_profiles')
+          .select('avatar_url, full_name')
+          .eq('id', route.params.seniorId)
+          .single();
+        
+        // Combine all data
+        const seniorDetails: Senior = {
+          id: seniorData.id,
+          name: seniorData.name || 'Senior',
+          status: 'online', // Default status
+          lastActive: 'Recently',
+          avatar: profileData?.avatar_url || '',
+          heartRate: 72, // Default values
+          oxygen: 98,
+          steps: 0,
+          battery: 100,
+          location: 'Home',
+          relationship: connectionData?.connection_name || 'Family Member',
+          email: seniorData.email,
+          phone: seniorData.phone
+        };
+        
+        setSenior(seniorDetails);
+        
       } catch (error) {
         console.error('Error fetching senior details:', error);
-        // Optionally show error to user
+        Alert.alert('Error', 'Failed to load senior details. Please try again.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSeniorDetails();
+    if (route.params.seniorId) {
+      fetchSeniorDetails();
+    }
   }, [route.params.seniorId]);
 
   // Initialize with empty arrays that will be populated when data is available
@@ -384,9 +438,16 @@ const SeniorDetailScreen = () => {
             />
           </View>
           
-          <Text style={[styles.seniorName, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-            {senior.name}
-          </Text>
+          <View style={styles.nameContainer}>
+            <Text style={[styles.seniorName, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
+              {senior.name}
+            </Text>
+            {senior.relationship && (
+              <Text style={[styles.relationshipText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+                {senior.relationship}
+              </Text>
+            )}
+          </View>
           
           <Text style={[styles.lastActive, { color: isDark ? '#A0AEC0' : '#718096' }]}>
             {`${lastUpdatedText} ${senior.lastActive}`}
@@ -435,6 +496,35 @@ const SeniorDetailScreen = () => {
               </Text>
             </TouchableOpacity>
           </View>
+          
+          <TouchableOpacity 
+            style={[styles.connectionButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
+            onPress={() => {
+              // Navigate to connection details screen
+              Alert.alert(
+                'Connection Details',
+                `Relationship: ${senior.relationship || 'Family Member'}\n` +
+                `Status: Connected\n` +
+                (senior.email ? `Email: ${senior.email}\n` : '') +
+                (senior.phone ? `Phone: ${senior.phone}` : '')
+              );
+            }}
+          >
+            <Ionicons 
+              name="link" 
+              size={20} 
+              color={isDark ? '#48BB78' : '#2F855A'} 
+              style={styles.connectionIcon}
+            />
+            <Text style={[styles.connectionButtonText, { color: isDark ? '#48BB78' : '#2F855A' }]}>
+              View Connection Details
+            </Text>
+            <Ionicons 
+              name="chevron-forward" 
+              size={20} 
+              color={isDark ? '#A0AEC0' : '#718096'} 
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Tabs */}
@@ -637,6 +727,16 @@ const styles = StyleSheet.create({
   avatarContainer: {
     position: 'relative',
     marginBottom: 16,
+    alignItems: 'center',
+  },
+  nameContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  relationshipText: {
+    fontSize: 16,
+    color: '#718096',
+    marginTop: 4,
   },
   avatar: {
     width: 100,
@@ -667,8 +767,25 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    width: '100%',
+  },
+  connectionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    width: '100%',
+  },
+  connectionIcon: {
+    marginRight: 8,
+  },
+  connectionButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
   },
   actionButton: {
     flexDirection: 'row',

@@ -12,7 +12,7 @@ import {
   Platform,
   ActivityIndicator
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/theme/ThemeContext';
@@ -22,7 +22,7 @@ import { supabase } from '../../lib/supabase';
 type RootStackParamList = {
   HomeTab: { refresh?: boolean };
   Seniors: { refresh?: boolean };
-  AddSenior: undefined;
+  AddSenior: { onSuccess?: () => void };
   // Add other screens as needed
 };
 
@@ -46,9 +46,10 @@ type SeniorProfile = {
 
 const AddSeniorScreen = () => {
   const [seniorId, setSeniorId] = useState('');
+  const [relationship, setRelationship] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const route = useRoute();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'AddSenior'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'AddSenior'>>();
   const { isDark } = useTheme();
   const { t } = useTranslation();
 
@@ -140,9 +141,9 @@ const AddSeniorScreen = () => {
     }
   };
 
-  const connectToSenior = async (profile: SeniorProfile) => {
+  const connectToSenior = async (profile: SeniorProfile, relationshipName: string) => {
     try {
-      console.log('Connecting to senior with profile:', profile);
+      console.log('Connecting to senior with profile:', profile, 'and relationship:', relationshipName);
       
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
@@ -200,14 +201,14 @@ const AddSeniorScreen = () => {
         senior = newSenior;
       }
 
-      // 3. Create or update the relationship
-      console.log('Creating/updating relationship...');
+      // 3. Create the relationship in family_relationships table
+      console.log('Creating relationship in family_relationships...');
       const { error: relError } = await supabase
         .from('family_relationships')
         .upsert({
           senior_user_id: senior.id,
           family_member_id: user.id,
-          status: 'active',
+          status: 'accepted',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }, {
@@ -215,8 +216,31 @@ const AddSeniorScreen = () => {
         });
 
       if (relError) {
-        console.error('Error creating relationship:', relError);
+        console.error('Error creating relationship in family_relationships:', relError);
         throw new Error(`Failed to create relationship: ${relError.message}`);
+      }
+
+      // 4. Create the connection in family_connections table
+      console.log('Creating connection in family_connections...');
+      const { error: connError } = await supabase
+        .from('family_connections')
+        .upsert({
+          senior_user_id: senior.id,
+          family_user_id: user.id,
+          status: 'accepted',
+          connection_name: relationshipName || 'Family Member',
+          senior_name: senior.name,
+          senior_email: senior.email,
+          senior_phone: senior.phone,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'senior_user_id,family_user_id'
+        });
+
+      if (connError) {
+        console.error('Error creating connection in family_connections:', connError);
+        throw new Error(`Failed to create connection: ${connError.message}`);
       }
 
       console.log('Successfully connected to senior:', senior);
@@ -256,7 +280,7 @@ const AddSeniorScreen = () => {
       }
       
       // Connect to the senior (will create if doesn't exist)
-      const connectedSenior = await connectToSenior(profile);
+      const connectedSenior = await connectToSenior(profile, relationship);
       
       // Show success message and navigate back
       Alert.alert(
@@ -266,15 +290,13 @@ const AddSeniorScreen = () => {
           {
             text: 'OK',
             onPress: () => {
+              // Go back to the previous screen with a success flag
               if (navigation.canGoBack()) {
                 navigation.goBack();
-                // Emit an event or use a callback to refresh the list
+                // If there's a callback in route params, call it
                 if (route.params?.onSuccess) {
                   route.params.onSuccess();
                 }
-              } else {
-                // Fallback to home if can't go back
-                navigation.navigate('HomeTab', {});
               }
             }
           }
@@ -337,24 +359,43 @@ const AddSeniorScreen = () => {
                   borderColor: isDark ? '#4A5568' : '#E2E8F0'
                 }
               ]}
-              placeholder={t('Senior ID')}
+              placeholder={t('Senior ID or Email')}
               placeholderTextColor={isDark ? '#718096' : '#A0AEC0'}
               value={seniorId}
               onChangeText={setSeniorId}
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="email"
+              keyboardType="email-address"
+            />
+            
+            <TextInput
+              style={[
+                styles.input, 
+                { 
+                  backgroundColor: isDark ? '#2D3748' : '#F7FAFC',
+                  color: isDark ? '#E2E8F0' : '#1A202C',
+                  borderColor: isDark ? '#4A5568' : '#E2E8F0',
+                  marginTop: 16
+                }
+              ]}
+              placeholder={t('Relationship (e.g., Mother, Father, Grandparent)')}
+              placeholderTextColor={isDark ? '#718096' : '#A0AEC0'}
+              value={relationship}
+              onChangeText={setRelationship}
+              autoCapitalize="words"
             />
 
             <TouchableOpacity 
               style={[
                 styles.submitButton, 
                 { 
-                  backgroundColor: seniorId ? (isDark ? '#48BB78' : '#2F855A') : (isDark ? '#2D3748' : '#E2E8F0'),
-                  opacity: seniorId ? 1 : 0.7
+                  backgroundColor: (seniorId && relationship) ? (isDark ? '#48BB78' : '#2F855A') : (isDark ? '#2D3748' : '#E2E8F0'),
+                  opacity: (seniorId && relationship) ? 1 : 0.7
                 }
               ]}
               onPress={handleSubmit}
-              disabled={!seniorId || isLoading}
+              disabled={!seniorId || !relationship || isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" />
