@@ -290,26 +290,6 @@ const RootNavigator = () => {
         options={{ headerShown: false }}
       />
       
-      {/* Health History Screen */}
-      <Stack.Screen 
-        name="HealthHistory" 
-        component={require('../screens/family/HealthHistoryScreen').default}
-        options={{ 
-          title: 'Health History',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
-            elevation: 0,
-            shadowOpacity: 0,
-            borderBottomWidth: 0,
-          },
-          headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
-          headerTitleStyle: {
-            fontWeight: '600',
-          },
-        }}
-      />
-      
       {/* Settings Screen */}
       <Stack.Screen 
         name="Settings" 

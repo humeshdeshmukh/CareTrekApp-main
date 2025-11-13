@@ -41,7 +41,6 @@ export type FamilyStackParamList = {
   // Screens
   SeniorDetail: { seniorId: string };
   NewConnectSenior: undefined;
-  HealthHistory: { seniorId: string };
   HomeNew: undefined;
   AddSenior: undefined;
   

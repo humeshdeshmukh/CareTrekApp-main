@@ -18,13 +18,16 @@ interface Senior {
 
 type RootStackParamList = {
   AddSenior: undefined;
-  HealthHistory: { seniorId: string };
-  Alerts: undefined;
   SeniorDetail: { seniorId: string };
+  Health: undefined;
+  Medication: undefined;
+  Reminders: undefined;
+  SeniorAppointments: { seniorId: string };
+  HealthHistory: { seniorId: string };
 };
 
 const HomeScreenFamily = () => {
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<any>(); // Using any to avoid type issues with navigation
   const { isDark, colors } = useTheme();
   const { t } = useTranslation();
   const [connectedSeniors, setConnectedSeniors] = useState<Senior[]>([]);
@@ -32,7 +35,7 @@ const HomeScreenFamily = () => {
   const isFocused = useIsFocused();
   
   // Get text color based on theme
-  const textColor = isDark ? colors.text : colors.textDark;
+  const textColor = isDark ? colors.text : '#1F2937';
 
   // Define the type for the relationship with profile
   interface UserProfile {
@@ -166,7 +169,7 @@ const HomeScreenFamily = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Stats Overview */}
+        {/* Stats Overview with Add Senior */}
         <View style={styles.statsContainer}>
           <View style={[styles.statCard, { backgroundColor: isDark ? '#1E293B' : '#EFF6FF' }]}>
             <View style={[styles.statIcon, { backgroundColor: isDark ? '#3B82F6' : '#3B82F6' }]}>
@@ -184,54 +187,79 @@ const HomeScreenFamily = () => {
             <Text style={[styles.statLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>{t('Active')}</Text>
           </View>
           
-          <View style={[styles.statCard, { backgroundColor: isDark ? '#1E293B' : '#FEF2F2' }]}>
-            <View style={[styles.statIcon, { backgroundColor: isDark ? '#EF4444' : '#EF4444' }]}>
-              <Ionicons name="alert-circle" size={20} color="#FFFFFF" />
+          <TouchableOpacity 
+            style={[styles.statCard, { 
+              backgroundColor: isDark ? '#2D3748' : '#F1F5F9',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 12
+            }]}
+            onPress={handleAddSenior}
+          >
+            <View style={[styles.statIcon, { backgroundColor: isDark ? '#4F46E5' : '#4F46E5' }]}>
+              <Ionicons name="person-add" size={20} color="#FFFFFF" />
             </View>
-            <Text style={[styles.statValue, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>0</Text>
-            <Text style={[styles.statLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>{t('Alerts')}</Text>
-          </View>
+            <Text style={[styles.statValue, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>+</Text>
+            <Text style={[styles.statLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>{t('Add Senior')}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Quick Actions */}
-        <View style={[styles.section, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }]}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
+        <View style={[styles.section, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF', marginBottom: 16 }]}>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#1E293B', marginBottom: 16 }]}>
             {t('Quick Actions')}
           </Text>
-          <View style={styles.quickActions}>
+          
+          <View style={styles.quickActionsGrid}>
+            {/* Health */}
             <TouchableOpacity 
               style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#F1F5F9' }]}
-              onPress={handleAddSenior}
+              onPress={() => navigation.navigate('Health' as never)}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#4F46E5' : '#4F46E5' }]}>
-                <Ionicons name="person-add" size={20} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
-                {t('Add Senior')}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#F1F5F9' }]}
-              onPress={() => navigation.navigate('HealthHistory', { seniorId: connectedSeniors[0]?.id || '' })}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#10B981' : '#10B981' }]}>
-                <Ionicons name="medkit" size={20} color="#FFFFFF" />
+                <Ionicons name="heart" size={20} color="#FFFFFF" />
               </View>
               <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
                 {t('Health')}
               </Text>
             </TouchableOpacity>
             
+            {/* Medication */}
             <TouchableOpacity 
               style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#F1F5F9' }]}
-              onPress={() => navigateToScreen('Alerts')}
+              onPress={() => navigation.navigate('Medication' as never)}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#10B981' : '#10B981' }]}>
+                <Ionicons name="medkit" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
+                {t('Medication')}
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Reminders */}
+            <TouchableOpacity 
+              style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#F1F5F9' }]}
+              onPress={() => navigation.navigate('Reminders' as never)}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#F59E0B' : '#F59E0B' }]}>
                 <Ionicons name="notifications" size={20} color="#FFFFFF" />
               </View>
               <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
-                {t('Alerts')}
+                {t('Reminders')}
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Appointments */}
+            <TouchableOpacity 
+              style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#F1F5F9' }]}
+              onPress={() => navigation.navigate('SeniorAppointments', { seniorId: '' })}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#EC4899' : '#EC4899' }]}>
+                <Ionicons name="calendar" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
+                {t('Appointments')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -322,7 +350,7 @@ const HomeScreenFamily = () => {
           )}
         </View>
 
-        {/* Recent Activity */}
+        {/* Recent Activity
         <View style={[styles.section, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
@@ -348,7 +376,7 @@ const HomeScreenFamily = () => {
               </Text>
             </View>
           </View>
-        </View>
+        </View> */}
       </ScrollView>
     </SafeAreaView>
   );
@@ -452,27 +480,33 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginHorizontal: -4,
   },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
   quickAction: {
     width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
+    padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    marginHorizontal: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickActionIcon: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginBottom: 8,
   },
   quickActionText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
+    textAlign: 'center',
   },
+  // Quick action styles are now defined above
   seniorsList: {
     paddingVertical: 8,
   },

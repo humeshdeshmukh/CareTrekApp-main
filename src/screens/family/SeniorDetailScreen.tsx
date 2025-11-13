@@ -1,986 +1,765 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  SafeAreaView, 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
   Image,
-  Linking,
-  Alert,
-  Share,
-  Dimensions,
-  ActivityIndicator
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  SafeAreaView,
+  Switch,
+  ImageSourcePropType
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { supabase } from '../../lib/supabase';
-import { useTheme } from '../../contexts/theme/ThemeContext';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
+import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
+import { supabase } from '../../lib/supabase';
 
-const { width } = Dimensions.get('window');
+// Default image
+const defaultAvatar: ImageSourcePropType = require('../../../assets/icon.png');
 
+// Theme colors
+const colors = {
+  background: '#F8FAFC',
+  card: '#FFFFFF',
+  primary: '#4F46E5',
+  notification: '#DC2626',
+  border: '#E5E7EB',
+  text: '#111827',
+  muted: '#6B7280',
+};
+
+// Define the navigation parameters for the screens we'll be navigating to
 type RootStackParamList = {
   SeniorDetail: { seniorId: string };
   TrackSenior: { seniorId: string };
-  HealthHistory: { seniorId: string };
-  Messages: { 
-    seniorId: string;
-    seniorName?: string;
-    seniorAvatar?: string;
-    status?: 'online' | 'offline' | 'alert';
-  };
+  Messages: { seniorId: string; seniorName?: string; seniorAvatar?: string; status?: string };
+  Health: undefined;
+  Medication: { seniorId: string };
+  Reminders: { seniorId: string };
+  SeniorAppointments: { seniorId: string };
+  Settings: undefined;
+  // Add other screens as needed
+  [key: string]: any;
 };
 
-type SeniorDetailRouteProp = RouteProp<RootStackParamList, 'SeniorDetail'>;
-
-type HealthMetric = {
-  id: string;
-  type: 'heart' | 'oxygen' | 'steps' | 'sleep' | 'medication' | 'activity' | 'battery';
-  value: string;
-  label: string;
-  unit?: string;
-  trend?: 'up' | 'down' | 'neutral';
-  status?: 'normal' | 'warning' | 'critical';
+type NavigationProp = StackNavigationProp<RootStackParamList> & {
+  navigate: <T extends keyof RootStackParamList>(
+    screen: T,
+    params: RootStackParamList[T]
+  ) => void;
 };
 
-type Activity = {
-  id: string;
-  type: 'walk' | 'medication' | 'alert' | 'location';
-  title: string;
-  time: string;
-  details?: string;
-  icon: string;
-};
-
-interface Senior {
+type SeniorLocal = {
   id: string;
   name: string;
   status: 'online' | 'offline' | 'alert';
   lastActive: string;
-  avatar: string;
-  heartRate: number;
-  oxygen: number;
-  steps: number;
-  battery: number;
+  avatar?: string;
+  heartRate?: number;
+  oxygen?: number;
+  steps?: number;
+  battery?: number;
   location: string;
   relationship?: string;
   email?: string;
   phone?: string;
-}
+};
 
-const SeniorDetailScreen = () => {
-  const route = useRoute<SeniorDetailRouteProp>();
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+type SeniorDetailRouteProp = RouteProp<RootStackParamList, 'SeniorDetail'>;
+
+// Navigation options configuration
+const NAVIGATION_OPTIONS = [
+  {
+    id: 'health',
+    title: 'Health',
+    icon: 'heart-outline' as const,
+    screen: 'Health' as const,
+    params: (seniorId: string) => ({ seniorId })
+  },
+  {
+    id: 'medication',
+    title: 'Medication',
+    icon: 'medical-outline' as const,
+    screen: 'Medication' as const,
+    params: (seniorId: string) => ({ seniorId })
+  },
+  {
+    id: 'reminders',
+    title: 'Reminders',
+    icon: 'notifications-outline' as const,
+    screen: 'Reminders' as const,
+    params: (seniorId: string) => ({ seniorId })
+  },
+  {
+    id: 'appointments',
+    title: 'Appointments',
+    icon: 'calendar-outline' as const,
+    screen: 'SeniorAppointments' as const,
+    params: (seniorId: string) => ({ seniorId })
+  }
+];
+
+const SeniorDetailScreen: React.FC = () => {
+  // Navigation and theme hooks
+  const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<{ params: { seniorId: string } }>>();
   const { isDark } = useTheme();
   const { currentLanguage } = useTranslation();
-  const [senior, setSenior] = useState<Senior | null>(null);
+  
+  // Translations
+  const { translatedText: loadingText } = useCachedTranslation('Loading senior...', currentLanguage);
+  const { translatedText: retryText } = useCachedTranslation('Retry', currentLanguage);
+  const { translatedText: errorText } = useCachedTranslation('Unable to load senior', currentLanguage);
+  
+  // Get seniorId from route params with a default value
+  const seniorId = route.params?.seniorId || 'default-senior-id';
+  
+  // State hooks in a consistent order
+  const [senior, setSenior] = useState<SeniorLocal | null>(null);
   
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity'>('overview');
+  const [isConnected, setIsConnected] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Translations
-  const { translatedText: backText } = useCachedTranslation('Back', currentLanguage);
-  const { translatedText: overviewText } = useCachedTranslation('Overview', currentLanguage);
-  const { translatedText: activityText } = useCachedTranslation('Activity', currentLanguage);
-  const { translatedText: callText } = useCachedTranslation('Call', currentLanguage);
-  const { translatedText: messageText } = useCachedTranslation('Message', currentLanguage);
-  const { translatedText: locationText } = useCachedTranslation('Location', currentLanguage);
-  const { translatedText: healthMetricsText } = useCachedTranslation('Health Metrics', currentLanguage);
-  const { translatedText: recentActivityText } = useCachedTranslation('Recent Activity', currentLanguage);
-  const { translatedText: viewAllText } = useCachedTranslation('View All', currentLanguage);
-  const { translatedText: noActivityText } = useCachedTranslation('No recent activity', currentLanguage);
-  const { translatedText: bpmText } = useCachedTranslation('BPM', currentLanguage);
-  const { translatedText: spo2Text } = useCachedTranslation('SpO₂', currentLanguage);
-  const { translatedText: stepsText } = useCachedTranslation('Steps', currentLanguage);
-  const { translatedText: batteryText } = useCachedTranslation('Battery', currentLanguage);
-  const { translatedText: lastUpdatedText } = useCachedTranslation('Last updated', currentLanguage);
-  const { translatedText: shareText } = useCachedTranslation('Share', currentLanguage);
-  const { translatedText: viewOnMapText } = useCachedTranslation('View on Map', currentLanguage);
-  const { translatedText: viewHealthHistoryText } = useCachedTranslation('View Health History', currentLanguage);
-  const { translatedText: viewAllActivityText } = useCachedTranslation('View All Activity', currentLanguage);
-  const { translatedText: callConfirmationText } = useCachedTranslation('Call {name}?', currentLanguage);
-  const { translatedText: cancelText } = useCachedTranslation('Cancel', currentLanguage);
-  const { translatedText: yesText } = useCachedTranslation('Yes', currentLanguage);
-  const { translatedText: errorLoadingText } = useCachedTranslation('Error loading senior details', currentLanguage);
-  const { translatedText: retryText } = useCachedTranslation('Retry', currentLanguage);
+  // Status color function with theme support
+  const getStatusColor = (status: SeniorLocal['status']) => {
+    if (status === 'online') return '#48BB78'; // Green for online
+    if (status === 'alert') return '#F56565'; // Red for alert
+    return '#A0AEC0'; // Gray for offline
+  };
+
+  // fetch senior details from Supabase
+  const fetchSeniorDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch senior profile from profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', seniorId)
+        .single();
+
+      if (profileError) throw profileError;
+      
+      // Fetch senior details from seniors table if available
+      const { data: seniorData, error: seniorError } = await supabase
+        .from('seniors')
+        .select('*')
+        .eq('user_id', seniorId)
+        .single();
+      
+      // If there's an error fetching senior data, just log it and continue with profile data
+      if (seniorError) {
+        console.warn('Error fetching senior details:', seniorError);
+      }
+
+      // Combine profile and senior data
+      const seniorProfile: SeniorLocal = {
+        id: seniorId,
+        name: profileData.display_name || 'Senior',
+        status: 'online', // You might want to implement actual status checking
+        lastActive: new Date().toISOString(),
+        location: seniorData?.address || 'Location not set',
+        avatar: profileData.avatar_url || '',
+        relationship: seniorData?.relationship || 'Senior',
+        email: profileData.email || '',
+        phone: profileData.phone_number || 'Phone not set'
+      };
+      
+      setSenior(seniorProfile);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching senior details:', err);
+      setError('Failed to load senior details');
+      setLoading(false);
+      
+      // Set a default senior if there's an error
+      setSenior({
+        id: seniorId,
+        name: 'Senior',
+        status: 'offline',
+        lastActive: new Date().toISOString(),
+        location: 'Location not available',
+        avatar: '',
+        relationship: 'Senior',
+        email: '',
+        phone: 'Phone not available'
+      });
+    }
+  }, [seniorId]);
+  
+  // Load senior data on mount
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadData = async () => {
+      if (isMounted) {
+        await fetchSeniorDetails();
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchSeniorDetails]);
 
   useEffect(() => {
-    const fetchSeniorDetails = async () => {
-      try {
-        setLoading(true);
-        
-        // Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-          throw new Error(userError?.message || 'User not authenticated');
-        }
-        
-        // Get senior details
-        const { data: seniorData, error: seniorError } = await supabase
-          .from('seniors')
-          .select('*')
-          .eq('id', route.params.seniorId)
-          .single();
-          
-        if (seniorError) throw seniorError;
-        
-        // Get relationship info
-        const { data: connectionData, error: connError } = await supabase
-          .from('family_connections')
-          .select('*')
-          .eq('senior_user_id', route.params.seniorId)
-          .eq('family_user_id', user.id)
-          .single();
-          
-        if (connError) console.error('Error fetching relationship:', connError);
-        
-        // Get user profile for avatar
-        const { data: profileData } = await supabase
-          .from('user_profiles')
-          .select('avatar_url, full_name')
-          .eq('id', route.params.seniorId)
-          .single();
-        
-        // Combine all data
-        const seniorDetails: Senior = {
-          id: seniorData.id,
-          name: seniorData.name || 'Senior',
-          status: 'online', // Default status
-          lastActive: 'Recently',
-          avatar: profileData?.avatar_url || '',
-          heartRate: 72, // Default values
-          oxygen: 98,
-          steps: 0,
-          battery: 100,
-          location: 'Home',
-          relationship: connectionData?.connection_name || 'Family Member',
-          email: seniorData.email,
-          phone: seniorData.phone
-        };
-        
-        setSenior(seniorDetails);
-        
-      } catch (error) {
-        console.error('Error fetching senior details:', error);
-        Alert.alert('Error', 'Failed to load senior details. Please try again.');
-      } finally {
-        setLoading(false);
+    let isMounted = true;
+    
+    const loadData = async () => {
+      if (isMounted) {
+        await fetchSeniorDetails();
       }
     };
+    
+    loadData();
+    
+    // Set up a simple interval to simulate real-time updates
+    const intervalId = setInterval(() => {
+      if (isMounted) {
+        setSenior(prev => ({
+          ...prev!,
+          lastActive: new Date().toISOString(),
+        }));
+      }
+    }, 60000); // Update every minute
+    
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [fetchSeniorDetails, isConnected]);
 
-    if (route.params.seniorId) {
-      fetchSeniorDetails();
-    }
-  }, [route.params.seniorId]);
-
-  // Initialize with empty arrays that will be populated when data is available
-  const healthMetrics: HealthMetric[] = [
-    { id: '1', type: 'heart', value: '--', label: bpmText, unit: 'BPM', trend: 'neutral', status: 'normal' },
-    { id: '2', type: 'oxygen', value: '--', label: spo2Text, unit: '%', trend: 'neutral', status: 'normal' },
-    { id: '3', type: 'steps', value: '0', label: stepsText, trend: 'neutral' },
-    { id: '4', type: 'battery', value: '--', label: batteryText, unit: '%', status: 'normal' },
-  ];
-
-  const recentActivity: Activity[] = []; // Empty array until API is implemented
-
-  const handleCall = () => {
+  const toggleConnection = useCallback(async () => {
     if (!senior) return;
     
-    Alert.alert(
-      callConfirmationText.replace('{name}', senior.name),
-      '',
-      [
-        { text: cancelText, style: 'cancel' },
-        { 
-          text: yesText, 
-          onPress: () => {
-            // In a real app, this would initiate a call
-            console.log('Calling', senior.name);
-            // Linking.openURL(`tel:${senior.phoneNumber}`);
-          } 
-        },
-      ]
-    );
-  };
-
-  const handleMessage = () => {
-    if (!senior) return;
-    navigation.navigate('Messages', { 
-      seniorId: senior.id,
-      seniorName: senior.name,
-      seniorAvatar: senior.avatar,
-      status: senior.status
-    });
-  };
-
-  const handleLocation = () => {
-    if (!senior) return;
-    navigation.navigate('TrackSenior', { seniorId: senior.id });
-  };
-
-  const handleShare = async () => {
-    if (!senior) return;
+    const newStatus = !isConnected;
     
     try {
-      await Share.share({
-        message: `${senior.name}'s current status: ${senior.status === 'online' ? 'Online' : 'Needs Attention'}. Location: ${senior.location}`,
-        title: `${senior.name}'s Status`,
-      });
-    } catch (error) {
-      console.error('Error sharing:', error);
+      // Update connection status in the database
+      const { error } = await supabase
+        .from('family_connections')
+        .update({ status: newStatus ? 'active' : 'inactive' })
+        .eq('senior_user_id', seniorId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setIsConnected(newStatus);
+      
+      setSenior(prev => prev ? {
+        ...prev,
+        status: newStatus ? 'online' : 'offline',
+        lastActive: new Date().toISOString()
+      } : null);
+      
+      console.log(`Successfully ${newStatus ? 'connected to' : 'disconnected from'} senior:`, senior.name);
+      
+    } catch (err) {
+      console.error('Error updating connection status:', err);
+      // Revert the toggle if there's an error
+      setIsConnected(!newStatus);
     }
-  };
+  }, [senior, isConnected, seniorId]);
 
-  const renderHealthMetric = (metric: HealthMetric) => {
-    const getIcon = () => {
-      switch (metric.type) {
-        case 'heart':
-          return 'heart';
-        case 'oxygen':
-          return 'pulse';
-        case 'steps':
-          return 'walk';
-        case 'battery':
-          return 'battery-medium';
-        default:
-          return 'help-circle';
-      }
-    };
+  // Render loading state if data is being fetched
+  const renderLoading = () => (
+    <View style={styles.centered}>
+      <ActivityIndicator size="large" color={isDark ? '#48BB78' : '#2F8550'} />
+      <Text style={[styles.muted, { marginTop: 12, color: isDark ? '#94A3B8' : '#64748B' }]}>
+        {loadingText}
+      </Text>
+    </View>
+  );
 
-    const getIconColor = () => {
-      if (metric.status === 'warning') return '#ED8936';
-      if (metric.status === 'critical') return '#E53E3E';
-      return isDark ? '#48BB78' : '#2F855A';
-    };
-
-    return (
-      <View 
-        key={metric.id}
-        style={[styles.metricCard, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}
-      >
-        <View style={styles.metricIconContainer}>
-          <Ionicons 
-            name={getIcon() as any} 
-            size={20} 
-            color={getIconColor()} 
-          />
-        </View>
-        <View style={styles.metricContent}>
-          <Text style={[styles.metricValue, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-            {metric.value}{metric.unit ? ` ${metric.unit}` : ''}
-          </Text>
-          <Text style={[styles.metricLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-            {metric.label}
-          </Text>
-        </View>
-        {metric.trend && (
-          <Ionicons 
-            name={metric.trend === 'up' ? 'trending-up' : 'trending-down'} 
-            size={20} 
-            color={metric.trend === 'up' ? '#48BB78' : '#E53E3E'} 
-          />
-        )}
-      </View>
-    );
-  };
-
-  const renderActivityItem = (activity: Activity) => {
-    const getIcon = () => {
-      switch (activity.type) {
-        case 'walk':
-          return 'walk';
-        case 'medication':
-          return 'medical-bag';
-        case 'alert':
-          return 'alert-circle';
-        case 'location':
-          return 'map-marker';
-        default:
-          return 'information-circle';
-      }
-    };
-
-    const getIconColor = () => {
-      switch (activity.type) {
-        case 'alert':
-          return '#E53E3E';
-        case 'medication':
-          return '#4299E1';
-        case 'walk':
-          return '#48BB78';
-        case 'location':
-          return '#9F7AEA';
-        default:
-          return isDark ? '#A0AEC0' : '#718096';
-      }
-    };
-
-    return (
-      <View 
-        key={activity.id}
-        style={[styles.activityItem, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}
-      >
-        <View 
-          style={[
-            styles.activityIconContainer, 
-            { backgroundColor: `${getIconColor()}20` }
-          ]}
-        >
-          <MaterialCommunityIcons 
-            name={activity.icon as any} 
-            size={20} 
-            color={getIconColor()} 
-          />
-        </View>
-        <View style={styles.activityItemContent}>
-          <Text style={[styles.activityTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-            {activity.title}
-          </Text>
-          {activity.details && (
-            <Text style={[styles.activityDetails, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-              {activity.details}
-            </Text>
-          )}
-        </View>
-        <Text style={[styles.activityTime, { color: isDark ? '#A0AEC0' : '#A0AEC0' }]}>
-          {activity.time}
-        </Text>
-      </View>
-    );
-  };
-
+  // Loading state
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
-        <ActivityIndicator size="large" color={isDark ? '#48BB78' : '#2F855A'} />
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={isDark ? '#48BB78' : '#2F855A'} />
+          <Text style={[styles.muted, { marginTop: 12, color: isDark ? '#94A3B8' : '#64748B' }]}>
+            {loadingText}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
+  if (!senior) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
+        <View style={styles.centered}>
+          <Ionicons 
+            name="warning" 
+            size={48} 
+            color={isDark ? '#F56565' : '#DC2626'} 
+          />
+          <Text style={[styles.muted, { marginTop: 16, color: isDark ? '#E2E8F0' : '#4A5568' }]}>
+            No senior data available
+          </Text>
+          <TouchableOpacity 
+            style={[styles.button, { 
+              backgroundColor: isDark ? '#48BB78' : '#2F855A',
+              marginTop: 16,
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 8
+            }]} 
+            onPress={fetchSeniorDetails}
+          >
+            <Text style={[styles.buttonText, { color: 'white' }]}>
+              Retry
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  if (!senior) {
+  // Error state
+  if (error) {
     return (
-      <View style={[styles.errorContainer, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
-        <Ionicons name="warning" size={48} color={isDark ? '#E53E3E' : '#C53030'} />
-        <Text style={[styles.errorText, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-          {errorLoadingText}
-        </Text>
-        <TouchableOpacity 
-          style={[styles.retryButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
-          onPress={() => setLoading(true)}
-        >
-          <Text style={[styles.retryButtonText, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-            {retryText}
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
+        <View style={styles.centered}>
+          <Ionicons 
+            name="warning" 
+            size={56} 
+            color={isDark ? '#F56565' : '#DC2626'} 
+          />
+          <Text style={[styles.errorText, { color: isDark ? '#F56565' : '#DC2626', marginTop: 12 }]}>
+            {errorText}
           </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity 
+            style={[styles.button, styles.primaryButton, { 
+              backgroundColor: isDark ? '#48BB78' : '#2F855A',
+              marginTop: 24
+            }]} 
+            onPress={fetchSeniorDetails}
+          >
+            <Text style={[styles.buttonText, { color: 'white' }]}>
+              {retryText}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
+
+  // Navigation options with proper typing
+  const navigationOptions = NAVIGATION_OPTIONS.map(option => {
+    const params = option.params(senior.id);
+    return {
+      ...option,
+      onPress: () => {
+        // Type assertion to handle the navigation params
+        (navigation as any).navigate(option.screen, params);
+      }
+    };
+  });
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: isDark ? '#2D3748' : '#E2E8F0' }]}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons 
-            name="arrow-back" 
-            size={24} 
-            color={isDark ? '#E2E8F0' : '#1A202C'} 
-          />
-          <Text style={[styles.backButtonText, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-            {backText}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>
+            {senior.name}'s Profile
           </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity onPress={handleShare}>
-          <Ionicons 
-            name="share-social" 
-            size={24} 
-            color={isDark ? '#E2E8F0' : '#1A202C'} 
-          />
-        </TouchableOpacity>
-      </View>
+        </View>
 
-      {/* Profile Section */}
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.profileSection}>
+        {/* Profile Card */}
+        <View style={[styles.profileCard, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
           <View style={styles.avatarContainer}>
-            {senior.avatar ? (
+            <View style={[styles.avatarWrapper, { borderColor: isDark ? '#4A5568' : '#E2E8F0' }]}>
               <Image 
-                source={{ uri: senior.avatar }} 
+                source={senior.avatar ? { uri: senior.avatar } : defaultAvatar} 
                 style={styles.avatar} 
               />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="person" size={50} color="#718096" />
-              </View>
-            )}
-            <View 
-              style={[
-                styles.statusBadge,
-                { 
-                  backgroundColor: senior.status === 'online' 
-                    ? '#48BB78' 
-                    : senior.status === 'alert' 
-                      ? '#E53E3E' 
-                      : '#A0AEC0',
-                }
-              ]} 
-            />
-          </View>
-          
-          <View style={styles.nameContainer}>
-            <Text style={[styles.seniorName, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-              {senior.name}
-            </Text>
-            {senior.relationship && (
-              <Text style={[styles.relationshipText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+              <View 
+                style={[styles.statusBadge, { 
+                  backgroundColor: getStatusColor(senior.status) 
+                }]} 
+              />
+            </View>
+            
+            <View style={styles.profileInfo}>
+              <Text style={[styles.seniorName, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>
+                {senior.name}
+              </Text>
+              <Text style={[styles.relationship, { color: isDark ? '#A0AEC0' : '#64748B' }]}>
                 {senior.relationship}
               </Text>
-            )}
+              
+              <View style={styles.connectionSwitch}>
+                <Text style={[styles.connectionText, { color: isDark ? '#E2E8F0' : '#4A5568' }]}>
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </Text>
+                <Switch
+                  value={isConnected}
+                  onValueChange={toggleConnection}
+                  trackColor={{ false: '#E2E8F0', true: isDark ? '#48BB78' : '#2F855A' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+              
+              {/* Contact Information */}
+              <View style={styles.contactInfo}>
+                <Text style={[styles.contactSectionTitle, { color: isDark ? '#E2E8F0' : '#4B5563' }]}>
+                  Contact Information
+                </Text>
+                
+                <View style={[styles.contactItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', padding: 10, borderRadius: 8 }]}>
+                  <View style={[styles.contactIconContainer, { backgroundColor: isDark ? '#2D3748' : '#EDF2F7' }]}>
+                    <Ionicons 
+                      name="mail-outline" 
+                      size={18} 
+                      color={isDark ? '#A0AEC0' : '#4A5568'} 
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.contactLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Email</Text>
+                    <Text style={[styles.contactText, { color: isDark ? '#F8FAFC' : '#1A202C' }]} numberOfLines={1}>
+                      {senior.email || 'Not provided'}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={[styles.contactItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', padding: 10, borderRadius: 8 }]}>
+                  <View style={[styles.contactIconContainer, { backgroundColor: isDark ? '#2D3748' : '#EDF2F7' }]}>
+                    <Ionicons 
+                      name="call-outline" 
+                      size={18} 
+                      color={isDark ? '#A0AEC0' : '#4A5568'} 
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.contactLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Phone</Text>
+                    <Text style={[styles.contactText, { color: isDark ? '#F8FAFC' : '#1A202C' }]}>
+                      {senior.phone || 'Not provided'}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={[styles.contactItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', padding: 10, borderRadius: 8 }]}>
+                  <View style={[styles.contactIconContainer, { backgroundColor: isDark ? '#2D3748' : '#EDF2F7' }]}>
+                    <Ionicons 
+                      name="location-outline" 
+                      size={18} 
+                      color={isDark ? '#A0AEC0' : '#4A5568'} 
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.contactLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Address</Text>
+                    <Text style={[styles.contactText, { color: isDark ? '#F8FAFC' : '#1A202C' }]}>
+                      {senior.location || 'Not provided'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
           </View>
-          
-          <Text style={[styles.lastActive, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-            {`${lastUpdatedText} ${senior.lastActive}`}
+        </View>
+
+        {/* Navigation Options */}
+        <View style={styles.optionsContainer}>
+          {navigationOptions.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={[styles.optionCard, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}
+              onPress={option.onPress}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: isDark ? '#2D3748' : '#F8FAFC' }]}>
+                <Ionicons 
+                  name={option.icon as any} 
+                  size={22} 
+                  color={isDark ? '#48BB78' : '#2F855A'} 
+                />
+              </View>
+              <Text style={[styles.optionText, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>
+                {option.title}
+              </Text>
+              <Ionicons 
+                name="chevron-forward" 
+                size={20} 
+                color={isDark ? '#718096' : '#A0AEC0'} 
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+        
+        {/* Last Seen */}
+        <View style={[styles.lastSeenContainer, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
+          <Ionicons name="time" size={16} color={isDark ? '#A0AEC0' : '#718096'} />
+          <Text style={[styles.lastSeenText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+            Last active: {formatLastSeen(senior.lastActive)}
           </Text>
-          
-          <View style={styles.actionButtons}>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
-              onPress={handleCall}
-            >
-              <Ionicons 
-                name="call" 
-                size={20} 
-                color={isDark ? '#48BB78' : '#2F855A'} 
-              />
-              <Text style={[styles.actionButtonText, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-                {callText}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
-              onPress={handleMessage}
-            >
-              <Ionicons 
-                name="chatbubble-ellipses" 
-                size={20} 
-                color={isDark ? '#4299E1' : '#2B6CB0'} 
-              />
-              <Text style={[styles.actionButtonText, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-                {messageText}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
-              onPress={handleLocation}
-            >
-              <Ionicons 
-                name="location" 
-                size={20} 
-                color={isDark ? '#9F7AEA' : '#6B46C1'} 
-              />
-              <Text style={[styles.actionButtonText, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-                {locationText}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          <TouchableOpacity 
-            style={[styles.connectionButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
-            onPress={() => {
-              // Navigate to connection details screen
-              Alert.alert(
-                'Connection Details',
-                `Relationship: ${senior.relationship || 'Family Member'}\n` +
-                `Status: Connected\n` +
-                (senior.email ? `Email: ${senior.email}\n` : '') +
-                (senior.phone ? `Phone: ${senior.phone}` : '')
-              );
-            }}
-          >
-            <Ionicons 
-              name="link" 
-              size={20} 
-              color={isDark ? '#48BB78' : '#2F855A'} 
-              style={styles.connectionIcon}
-            />
-            <Text style={[styles.connectionButtonText, { color: isDark ? '#48BB78' : '#2F855A' }]}>
-              View Connection Details
-            </Text>
-            <Ionicons 
-              name="chevron-forward" 
-              size={20} 
-              color={isDark ? '#A0AEC0' : '#718096'} 
-            />
-          </TouchableOpacity>
         </View>
-
-        {/* Tabs */}
-        <View style={[styles.tabsContainer, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'overview' && [
-                styles.activeTab,
-                { backgroundColor: isDark ? '#48BB78' : '#2F855A' }
-              ]
-            ]}
-            onPress={() => setActiveTab('overview')}
-          >
-            <Text 
-              style={[
-                styles.tabText,
-                { 
-                  color: activeTab === 'overview' 
-                    ? '#FFFFFF' 
-                    : isDark ? '#A0AEC0' : '#4A5568' 
-                }
-              ]}
-            >
-              {overviewText}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'activity' && [
-                styles.activeTab,
-                { backgroundColor: isDark ? '#48BB78' : '#2F855A' }
-              ]
-            ]}
-            onPress={() => setActiveTab('activity')}
-          >
-            <Text 
-              style={[
-                styles.tabText,
-                { 
-                  color: activeTab === 'activity' 
-                    ? '#FFFFFF' 
-                    : isDark ? '#A0AEC0' : '#4A5568' 
-                }
-              ]}
-            >
-              {activityText}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab === 'overview' ? (
-          <View style={styles.overviewContent}>
-            {/* Location Card */}
-            <View style={[styles.locationCard, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
-              <View style={styles.locationHeader}>
-                <Ionicons 
-                  name="location" 
-                  size={20} 
-                  color={isDark ? '#9F7AEA' : '#6B46C1'} 
-                />
-                <Text style={[styles.locationTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-                  {locationText}
-                </Text>
-              </View>
-              
-              <Text style={[styles.locationAddress, { color: isDark ? '#A0AEC0' : '#4A5568' }]}>
-                {senior.location}
-              </Text>
-              
-              <TouchableOpacity 
-                style={[styles.viewMapButton, { backgroundColor: isDark ? '#2D3748' : '#E2E8F0' }]}
-                onPress={handleLocation}
-              >
-                <Text style={[styles.viewMapButtonText, { color: isDark ? '#9F7AEA' : '#6B46C1' }]}>
-                  {viewOnMapText}
-                </Text>
-                <Ionicons 
-                  name="arrow-forward" 
-                  size={16} 
-                  color={isDark ? '#9F7AEA' : '#6B46C1'} 
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Health Metrics */}
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-                {healthMetricsText}
-              </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('HealthHistory', { seniorId: senior.id })}>
-                <Text style={[styles.viewAllText, { color: isDark ? '#48BB78' : '#2F855A' }]}>
-                  {viewHealthHistoryText}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.metricsGrid}>
-              {healthMetrics.map(metric => renderHealthMetric(metric))}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.activityItemContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-                {recentActivityText}
-              </Text>
-              <TouchableOpacity>
-                <Text style={[styles.viewAllText, { color: isDark ? '#48BB78' : '#2F855A' }]}>
-                  {viewAllActivityText}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            {recentActivity.length > 0 ? (
-              <View style={styles.activityList}>
-                {recentActivity.map(activity => renderActivityItem(activity))}
-              </View>
-            ) : (
-              <View style={styles.emptyActivity}>
-                <Ionicons 
-                  name="time" 
-                  size={48} 
-                  color={isDark ? '#4A5568' : '#A0AEC0'} 
-                />
-                <Text style={[styles.emptyText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-                  {noActivityText}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
 };
 
+// Helper function to format last seen time
+const formatLastSeen = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  
+  if (diffInHours < 1) {
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    return `${diffInMinutes} min ago`;
+  } else if (diffInHours < 24) {
+    return `${diffInHours} hours ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFBEF',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    marginTop: 16,
-    textAlign: 'center',
-    color: '#1A202C',
-  },
-  retryButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
+  scrollContent: {
+    paddingBottom: 24,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
+    padding: 24,
+    paddingBottom: 16,
   },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    fontFamily: 'Inter_700Bold',
   },
-  backButtonText: {
-    fontSize: 16,
-    marginLeft: 8,
-    color: '#1A202C',
-  },
-  scrollView: {
+  centered: {
     flex: 1,
-  },
-  profileSection: {
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  nameContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  relationshipText: {
+  muted: {
     fontSize: 16,
-    color: '#718096',
-    marginTop: 4,
+    textAlign: 'center',
+    marginTop: 12,
+    fontFamily: 'Inter_400Regular',
   },
-  avatar: {
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 8,
+    fontFamily: 'Inter_500Medium',
+  },
+  button: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 12,
+  },
+  primaryButton: {
+    shadowColor: '#2F855A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  profileCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: 'rgba(0, 0, 0, 0.05)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  avatarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatarWrapper: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#E2E8F0',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 3,
+    backgroundColor: '#F8FAFC',
+    overflow: 'hidden',
+  },
+  avatar: {
+    width: '100%',
+    height: '100%',
+  },
+  profileInfo: {
+    flex: 1,
+    marginLeft: 20,
+  },
+  seniorName: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+    fontFamily: 'Inter_700Bold',
+  },
+  relationship: {
+    fontSize: 15,
+    marginBottom: 16,
+    fontFamily: 'Inter_500Medium',
+  },
+  connectionSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+  },
+  connectionText: {
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
   },
   statusBadge: {
     position: 'absolute',
     bottom: 4,
     right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
   },
-  seniorName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A202C',
-    marginBottom: 4,
-  },
-  lastActive: {
-    fontSize: 14,
-    color: '#718096',
-    marginBottom: 16,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+  contactInfo: {
+    marginTop: 16,
     width: '100%',
-  },
-  connectionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    width: '100%',
-  },
-  connectionIcon: {
-    marginRight: 8,
-  },
-  connectionButtonText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginHorizontal: 4,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  actionButtonText: {
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1A202C',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
     borderRadius: 12,
-    padding: 4,
-    backgroundColor: '#E2E8F0',
+    padding: 16,
+    gap: 8,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  activeTab: {
-    backgroundColor: '#2F855A',
-  },
-  tabText: {
-    fontSize: 14,
+  contactSectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#4A5568',
+    marginBottom: 8,
+    color: '#4B5563',
   },
-  overviewContent: {
-    padding: 16,
-  },
-  locationCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  locationHeader: {
+  contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
   },
-  locationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-    color: '#1A202C',
-  },
-  locationAddress: {
-    fontSize: 14,
-    color: '#4A5568',
-    marginBottom: 12,
-  },
-  viewMapButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: '#E2E8F0',
-  },
-  viewMapButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6B46C1',
-    marginRight: 4,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    marginTop: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A202C',
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: '#2F855A',
-    fontWeight: '500',
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
-  },
-  metricCard: {
-    width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    margin: 4,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-  },
-  metricIconContainer: {
+  contactIconContainer: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(72, 187, 120, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  metricContent: {
-    flex: 1,
-  },
-  metricValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A202C',
+  contactLabel: {
+    fontSize: 12,
     marginBottom: 2,
   },
-  metricLabel: {
-    fontSize: 12,
-    color: '#718096',
+  contactText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
-  activityList: {
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginVertical: 4,
+    fontFamily: 'Inter_700Bold',
+  },
+  statUnit: {
+    fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.7,
+  },
+  statLabel: {
+    fontSize: 13,
+    marginTop: 2,
+    fontFamily: 'Inter_500Medium',
+  },
+  statDivider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    alignSelf: 'center',
+  },
+  // Navigation Options
+  optionsContainer: {
     marginTop: 8,
+    paddingHorizontal: 24,
   },
-  activityItem: {
+  optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    borderRadius: 14,
+    marginBottom: 12,
+    shadowColor: 'rgba(0, 0, 0, 0.05)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  optionIcon: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
-    marginBottom: 8,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-  },
-  activityIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
-  activityItemContent: {
+  optionText: {
     flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1A202C',
-    marginBottom: 2,
-  },
-  activityDetails: {
-    fontSize: 12,
-    color: '#718096',
-  },
-  activityTime: {
-    fontSize: 12,
-    color: '#A0AEC0',
-    marginLeft: 8,
-  },
-  emptyActivity: {
+  // Last Seen
+  lastSeenContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: 12,
+    borderRadius: 12,
+    marginHorizontal: 24,
+    marginTop: 8,
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#718096',
-    marginTop: 12,
-    textAlign: 'center',
-  },
+  lastSeenText: {
+    fontSize: 13,
+    marginLeft: 8,
+    fontFamily: 'Inter_500Medium',
+  }
 });
 
 export default SeniorDetailScreen;

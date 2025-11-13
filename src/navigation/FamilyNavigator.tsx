@@ -26,17 +26,18 @@ import {
 import HomeScreenFamily from '../screens/family/HomeScreenFamily';
 import SeniorsListScreen from '../screens/family/SeniorsListScreen';
 import SeniorDetailScreen from '../screens/family/SeniorDetailScreen';
-import AlertsScreen from '../screens/family/AlertsScreen';
 import FamilySettingsScreen from '../screens/family/FamilySettingsScreen';
-import HealthHistoryScreen from '../screens/family/HealthHistoryScreen';
 import AddSeniorScreen from '../screens/family/AddSeniorScreen';
 import EditProfileScreen from '../screens/Senior/EditProfileScreen';
+
+// Senior Management Screens - Removed as per request
 
 // Type definitions for tab navigation
 type FamilyTabParamList = {
   HomeTab: undefined;
   Seniors: { refresh?: boolean };
-  Alerts: undefined;
+  Medication: { seniorId?: string };
+  Reminders: { seniorId?: string };
   Settings: undefined;
 };
 
@@ -47,28 +48,12 @@ type FamilyStackParamList = {
   
   // Screens
   SeniorDetail: { seniorId: string };
-  NewConnectSenior: undefined;
-  HealthHistory: { seniorId: string };
-  HomeNew: undefined;
   AddSenior: undefined;
   
-  // Modals
-  FilterAlerts: undefined;
-  FilterMessages: undefined;
-  SortSeniors: undefined;
-  SortAlerts: undefined;
-  SortMessages: undefined;
-  
-  // Other
+  // Settings related
   Settings: undefined;
   EditProfile: undefined;
   ChangePassword: undefined;
-  NotificationSettings: undefined;
-  PrivacyPolicy: undefined;
-  TermsOfService: undefined;
-  HelpCenter: undefined;
-  ContactSupport: undefined;
-  About: undefined;
 };
 
 const Tab = createBottomTabNavigator<FamilyTabParamList>();
@@ -124,65 +109,66 @@ const TabNavigator = () => {
   const { isDark } = useTheme();
   const { t } = useTranslation();
 
-  // Custom tab bar button component
-  const TabBarButtonComponent: React.FC<BottomTabBarButtonProps> = (props) => (
-    <TabBarButton {...props} />
-  );
-
   return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: keyof typeof Ionicons.glyphMap = 'home';
+
+          if (route.name === 'HomeTab') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Seniors') {
+            iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'Medication') {
+            iconName = focused ? 'medkit' : 'medkit-outline';
+          } else if (route.name === 'Reminders') {
+            iconName = focused ? 'notifications' : 'notifications-outline';
+          } else if (route.name === 'Settings') {
+            iconName = focused ? 'settings' : 'settings-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: isDark ? '#48BB78' : '#2F855A',
+        tabBarInactiveTintColor: isDark ? '#A0AEC0' : '#718096',
         tabBarStyle: {
           backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
           borderTopColor: isDark ? '#2D3748' : '#E2E8F0',
-          height: 60,
-          paddingBottom: 5,
+          height: Platform.OS === 'ios' ? 90 : 70,
+          paddingTop: 10,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
         },
-        tabBarActiveTintColor: isDark ? '#63B3ED' : '#2B6CB0',
-        tabBarInactiveTintColor: isDark ? '#A0AEC0' : '#718096',
-        tabBarButton: (props) => <TabBarButtonComponent {...props} />,
-      }}
+        tabBarLabelStyle: {
+          fontSize: 10,
+          marginBottom: 5,
+        },
+        headerShown: false,
+      })}
     >
       <Tab.Screen
         name="HomeTab"
         component={HomeScreenFamily}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
-          tabBarLabel: t('Home') || 'Home',
-        }}
+        options={{ title: t('Home') || 'Home' }}
       />
       <Tab.Screen
         name="Seniors"
         component={SeniorsListScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size} color={color} />
-          ),
-          tabBarLabel: t('Seniors') || 'Seniors',
-        }}
+        options={{ title: t('Seniors') || 'Seniors' }}
       />
       <Tab.Screen
-        name="Alerts"
-        component={AlertsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications" size={size} color={color} />
-          ),
-          tabBarLabel: t('Alerts') || 'Alerts',
-        }}
+        name="Medication"
+        component={HomeScreenFamily} // Placeholder - replace with actual Medication screen component
+        options={{ title: t('Medication') || 'Medication' }}
       />
-<Tab.Screen
+      <Tab.Screen
+        name="Reminders"
+        component={HomeScreenFamily} // Placeholder - replace with actual Reminders screen component
+        options={{ title: t('Reminders') || 'Reminders' }}
+      />
+      <Tab.Screen
         name="Settings"
         component={FamilySettingsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
-          ),
-          tabBarLabel: t('Settings') || 'Settings',
-        }}
+        options={{ title: t('Settings') || 'Settings' }}
       />
     </Tab.Navigator>
   );
@@ -190,10 +176,8 @@ const TabNavigator = () => {
 
 // Main Family Navigator with Stack Navigation
 export const FamilyNavigator = () => {
-  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  
-  // No need to reinitialize the ref, using the one created above
+  const { isDark } = useTheme();
 
   return (
     <Stack.Navigator
@@ -203,57 +187,35 @@ export const FamilyNavigator = () => {
           elevation: 0,
           shadowOpacity: 0,
         },
-        headerTintColor: colors.primary,
+        headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
         headerTitleStyle: {
           fontWeight: '600',
         },
-        cardStyle: { backgroundColor: colors.background },
+        cardStyle: { backgroundColor: isDark ? '#1A202C' : '#F7FAFC' },
         cardStyleInterpolator,
       }}
-      // @ts-ignore - navigationRef is a valid prop for Stack.Navigator
-      ref={navigationRef}
     >
       <Stack.Screen 
         name="MainTabs" 
         component={TabNavigator} 
-        options={{ headerShown: false }}
+        options={{ headerShown: false }} 
       />
-      <Stack.Screen 
-        name="HomeNew" 
-        component={HomeScreenFamily} 
-        options={{
-          headerShown: false,
-          cardStyleInterpolator: CardStyleInterpolators.forFadeFromBottomAndroid,
-        }}
-      />
-      <Stack.Screen 
-        name="AddSenior" 
-        component={AddSeniorScreen} 
-        options={{
-          title: t('Add Senior'),
-          headerShown: false,
-          cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-        }}
-      />
+      
+      {/* Senior Management */}
       <Stack.Screen 
         name="SeniorDetail" 
         component={SeniorDetailScreen} 
         options={{ title: t('Senior Details') || 'Senior Details' }}
       />
       <Stack.Screen 
-        name="HealthHistory" 
-        component={HealthHistoryScreen} 
-        options={{ title: t('Health History') || 'Health History' }}
-      />
-      <Stack.Screen 
         name="Settings" 
         component={FamilySettingsScreen} 
         options={{ 
           title: t('Settings') || 'Settings',
-          headerShown: true,
+          headerShown: true
         }} 
       />
-<Stack.Screen 
+      <Stack.Screen 
         name="EditProfile" 
         component={EditProfileScreen}
         options={{
