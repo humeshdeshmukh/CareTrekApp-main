@@ -25,26 +25,9 @@ const HomeScreen = () => {
   const { translatedText: sosText } = useCachedTranslation('SOS', currentLanguage);
   const { translatedText: sosContactsText } = useCachedTranslation('SOS Contacts', currentLanguage);
   const { translatedText: quickActionsText } = useCachedTranslation('Quick Actions', currentLanguage);
-  const { translatedText: backText } = useCachedTranslation('Back', currentLanguage);
-
-  const handleBack = () => {
-    navigation.goBack();
-  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
-      {/* Back Button */}
-      <TouchableOpacity
-        style={[styles.backButton, { borderColor: isDark ? '#4A5568' : '#E2E8F0' }]}
-        onPress={handleBack}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="arrow-back" size={20} color={isDark ? '#E2E8F0' : '#4A5568'} />
-        <Text style={[styles.backButtonText, { color: isDark ? '#E2E8F0' : '#4A5568' }]}>
-          {backText}
-        </Text>
-      </TouchableOpacity>
-
       <ScrollView style={styles.scrollView}>
         {/* Header */}
         <View style={styles.header}>
