@@ -53,21 +53,38 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      setIsLoading(true);
-      await signOut();
-      // Navigate to WelcomeScreen and reset the navigation stack
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Welcome' }],
-      });
-    } catch (error) {
-      console.error('Sign out error:', error);
-      Alert.alert('Error', 'Failed to sign out. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          onPress: () => {},
+          style: 'cancel',
+        },
+        {
+          text: 'OK',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await signOut();
+              // Navigate to WelcomeScreen and reset the navigation stack
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Welcome' }],
+              });
+            } catch (error) {
+              console.error('Sign out error:', error);
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+          style: 'destructive',
+        },
+      ]
+    );
   };
 
 

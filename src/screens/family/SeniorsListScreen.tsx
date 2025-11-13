@@ -85,6 +85,10 @@ const SeniorsListScreen = () => {
   const { translatedText: lastSeenText } = useCachedTranslation('Last seen', currentLanguage);
   const { translatedText: noSeniorsText } = useCachedTranslation('No seniors connected yet', currentLanguage);
   const { translatedText: connectNowText } = useCachedTranslation('Connect now', currentLanguage);
+  const { translatedText: deleteText } = useCachedTranslation('Delete', currentLanguage);
+  const { translatedText: deleteSeniorText } = useCachedTranslation('Delete Connected Senior', currentLanguage);
+  const { translatedText: deleteSeniorConfirmText } = useCachedTranslation('Are you sure you want to remove this senior from your connections?', currentLanguage);
+  const { translatedText: cancelText } = useCachedTranslation('Cancel', currentLanguage);
 
   const fetchConnectedSeniors = async (forceRefresh: boolean = false) => {
     try {
@@ -190,6 +194,49 @@ const SeniorsListScreen = () => {
     }, [route.params?.refresh, navigation])
   );
 
+  const handleDeleteSenior = (senior: Senior) => {
+    Alert.alert(
+      deleteSeniorText,
+      deleteSeniorConfirmText,
+      [
+        {
+          text: cancelText,
+          onPress: () => {},
+          style: 'cancel',
+        },
+        {
+          text: deleteText,
+          onPress: async () => {
+            try {
+              // Get current user
+              const { data: { user }, error: userError } = await supabase.auth.getUser();
+              if (userError || !user) {
+                throw new Error(userError?.message || 'User not authenticated');
+              }
+
+              // Delete the relationship from family_relationships table
+              const { error: deleteError } = await supabase
+                .from('family_relationships')
+                .delete()
+                .eq('family_member_id', user.id)
+                .eq('senior_user_id', senior.id);
+
+              if (deleteError) throw deleteError;
+
+              // Refresh the list
+              fetchConnectedSeniors(true);
+              Alert.alert('Success', 'Senior removed from your connections');
+            } catch (error) {
+              console.error('Error deleting senior:', error);
+              Alert.alert('Error', 'Failed to remove senior. Please try again.');
+            }
+          },
+          style: 'destructive',
+        },
+      ]
+    );
+  };
+
   const renderStatusBadge = (status: Senior['status']) => {
     const statusConfig = {
       online: { color: '#48BB78', text: onlineText },
@@ -267,11 +314,28 @@ const SeniorsListScreen = () => {
           )}
         </View>
       </View>
-      <Ionicons 
-        name="chevron-forward" 
-        size={24} 
-        color={isDark ? '#718096' : '#A0AEC0'} 
-      />
+      <View style={styles.actionButtons}>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('SeniorDetail', { seniorId: item.id })}
+          style={styles.viewButton}
+        >
+          <Ionicons 
+            name="chevron-forward" 
+            size={24} 
+            color={isDark ? '#718096' : '#A0AEC0'} 
+          />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => handleDeleteSenior(item)}
+          style={styles.deleteButton}
+        >
+          <Ionicons 
+            name="trash" 
+            size={20} 
+            color="#E53E3E" 
+          />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -370,19 +434,19 @@ const styles = StyleSheet.create({
   seniorCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    elevation: 2,
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 16,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     marginRight: 16,
     backgroundColor: '#E2E8F0',
   },
@@ -396,8 +460,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   seniorName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1A202C',
   },
   statusBadge: {
@@ -423,14 +487,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
     width: '100%',
-    marginTop: 4,
+    marginTop: 6,
   },
   infoText: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 3,
   },
   metricsContainer: {
     flexDirection: 'row',
@@ -494,6 +558,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  viewButton: {
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+  },
+  deleteButton: {
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: 'rgba(229, 62, 62, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(229, 62, 62, 0.3)',
   },
 });
 
