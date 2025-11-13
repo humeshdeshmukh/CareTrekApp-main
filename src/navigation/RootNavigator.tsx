@@ -1,7 +1,6 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from '../contexts/theme/ThemeContext';
-import AuthCheck from './AuthCheck';
 
 // Import auth screens and navigator
 import { AuthNavigator } from './AuthNavigator';
@@ -48,6 +47,7 @@ export type RootStackParamList = {
   FamilySignIn: { email?: string };
   SeniorAuth: { role?: UserRole };
   SignIn: { role?: UserRole };
+  SeniorTabs: undefined;
   SignUp: { role?: UserRole };
   ForgotPassword: undefined;
   OTPVerification: { 
@@ -65,9 +65,6 @@ export type RootStackParamList = {
   
   // Main App
   Main: undefined;
-  
-  // Senior Stack
-  SeniorTabs: undefined;
   
   // Family Stack
   FamilyNavigator: undefined;
@@ -96,6 +93,11 @@ export type RootStackParamList = {
   Map: undefined;
   Reminders: undefined;
   SOSContacts: undefined;
+  Health: undefined;
+  HealthScreen: undefined;
+  RemindersScreen: undefined;
+  MapScreen: undefined;
+  IdShareScreen: undefined;
 };
 
 // Import AuthStackParamList from types
@@ -107,8 +109,7 @@ const RootNavigator = () => {
   const { colors, isDark } = useTheme();
 
   return (
-    <AuthCheck>
-      <Stack.Navigator
+          <Stack.Navigator
         initialRouteName="Welcome"
         screenOptions={{
           headerShown: false,
@@ -245,11 +246,14 @@ const RootNavigator = () => {
         
         <Stack.Screen name="SOSContacts" component={SOSContactsScreen} /> */}
       
-      {/* Main App Tabs */}
+      {/* Senior Tabs Navigator */}
       <Stack.Screen 
         name="SeniorTabs" 
         component={SeniorTabs}
-        options={{ gestureEnabled: false }}
+        options={{ 
+          headerShown: false,
+          gestureEnabled: false 
+        }}
       />
       
       {/* Family Navigator */}
@@ -390,8 +394,7 @@ const RootNavigator = () => {
         }}
       />
     </Stack.Navigator>
-  </AuthCheck>
-  );
+    );
 };
 
 export default RootNavigator;

@@ -1,12 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/RootNavigator';
+import { RootStackParamList } from '../types/navigation';
+import { SettingsStackParamList } from '../types/navigation';
 import { useTheme } from '../contexts/theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
-type MainAppScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainApp'>;
+type MainAppScreenNavigationProp = CompositeNavigationProp<
+  StackNavigationProp<RootStackParamList>,
+  StackNavigationProp<SettingsStackParamList>
+>;
 
 type Props = {
   route: {
@@ -16,37 +21,36 @@ type Props = {
   };
 };
 
-const MainApp = ({ route }: Props) => {
+const MainApp: React.FC<Props> = ({ route }) => {
   const navigation = useNavigation<MainAppScreenNavigationProp>();
-  const { isDark, theme } = useTheme();
+  const { isDark, colors } = useTheme();
   const isGuest = route.params?.isGuest || false;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>
+        <Text style={[styles.title, { color: colors.text }]}>
           {isGuest ? 'Guest Mode' : 'Welcome Back'}
         </Text>
         {isGuest && (
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             You're using the app in guest mode. Some features may be limited.
           </Text>
         )}
       </View>
 
       <View style={styles.content}>
-        {/* Add your main app content here */}
-        <View style={[styles.card, { backgroundColor: theme.card }]}>
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
           <Ionicons 
             name={isGuest ? 'person-outline' : 'person'} 
             size={60} 
-            color={theme.primary} 
+            color={colors.primary} 
             style={styles.icon}
           />
-          <Text style={[styles.cardTitle, { color: theme.text }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>
             {isGuest ? 'Guest User' : 'Authenticated User'}
           </Text>
-          <Text style={[styles.cardText, { color: theme.textSecondary }]}>
+          <Text style={[styles.cardText, { color: colors.textSecondary }]}>
             {isGuest 
               ? 'Sign up for a full account to unlock all features and save your progress.'
               : 'You have full access to all features.'}
@@ -54,35 +58,43 @@ const MainApp = ({ route }: Props) => {
           
           {isGuest && (
             <TouchableOpacity 
-              style={[styles.button, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('Auth', { screen: 'Register' })}
+              style={[styles.actionButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                if (isGuest) {
+                  navigation.navigate('Auth', { screen: 'SignIn' });
+                } else {
+                  navigation.navigate('Settings', { screen: 'SettingsMain' });
+                }
+              }}
             >
-              <Text style={styles.buttonText}>Sign Up for Full Access</Text>
+              <Text style={[styles.buttonText, { color: 'white' }]}>
+                {isGuest ? 'Sign In' : 'Go to Profile'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       {/* Bottom Navigation */}
-      <View style={[styles.bottomNav, { borderTopColor: theme.border }]}>
+      <View style={[styles.bottomNav, { borderTopColor: colors.border }]}>
         <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="home" size={24} color={theme.primary} />
-          <Text style={[styles.navText, { color: theme.primary }]}>Home</Text>
+          <Ionicons name="home" size={24} color={colors.primary} />
+          <Text style={[styles.navText, { color: colors.primary }]}>Home</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="search" size={24} color={theme.textSecondary} />
-          <Text style={[styles.navText, { color: theme.textSecondary }]}>Search</Text>
+          <Ionicons name="search" size={24} color={colors.textSecondary} />
+          <Text style={[styles.navText, { color: colors.textSecondary }]}>Search</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="notifications-outline" size={24} color={theme.textSecondary} />
-          <Text style={[styles.navText, { color: theme.textSecondary }]}>Alerts</Text>
+          <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
+          <Text style={[styles.navText, { color: colors.textSecondary }]}>Alerts</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.navItem}
-          onPress={() => navigation.navigate('Profile')}
+          onPress={() => navigation.navigate('Settings', { screen: 'SettingsMain' })}
         >
-          <Ionicons name="person-outline" size={24} color={theme.textSecondary} />
-          <Text style={[styles.navText, { color: theme.textSecondary }]}>Profile</Text>
+          <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
+          <Text style={[styles.navText, { color: colors.textSecondary }]}>Profile</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -136,12 +148,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 20,
   },
-  button: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+  actionButton: {
+    backgroundColor: '#4a90e2',
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    width: '100%',
+    marginTop: 16,
   },
   buttonText: {
     color: '#fff',

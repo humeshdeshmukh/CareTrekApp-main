@@ -2,13 +2,14 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from '../contexts/theme/ThemeContext';
 import { AuthStackParamList, UserRole } from './types';
+import { TouchableOpacity } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 // Import screens
 import WelcomeScreen from '../screens/WelcomeScreen';
 import FamilySignInScreen from '../screens/auth/FamilySignInScreen';
 import SeniorAuthScreen from '../screens/auth/SeniorAuthScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
-import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 import EditProfileScreen from '../screens/Senior/EditProfileScreen';
 
@@ -47,10 +48,36 @@ export const AuthNavigator = () => {
       <Stack.Screen 
         name="FamilySignIn" 
         component={FamilySignInScreen}
-        options={{ 
+        options={({ navigation }) => ({
           title: 'Family Member',
           headerBackTitle: 'Back',
-        }}
+          headerBackTitleVisible: true,
+          headerTitleStyle: {
+            fontSize: 20,
+            fontWeight: '600',
+            color: colors.text,
+          },
+          headerStyle: {
+            backgroundColor: colors.background,
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 0,
+          },
+          headerTintColor: colors.primary,
+          headerLeft: (props) => (
+            <TouchableOpacity 
+              onPress={navigation.goBack}
+              style={{ marginLeft: 10, padding: 8 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon 
+                name="arrow-left" 
+                size={24} 
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          ),
+        })}
       />
 
       {/* Senior Authentication */}
@@ -94,16 +121,7 @@ export const AuthNavigator = () => {
         }}
       />
 
-      <Stack.Screen 
-        name="ForgotPassword" 
-        component={ForgotPasswordScreen}
-        options={{ 
-          title: 'Reset Password',
-          headerBackTitle: 'Back',
-        }}
-      />
-
-      <Stack.Screen 
+<Stack.Screen 
         name="OTPVerification" 
         component={OTPVerificationScreen}
         options={{ title: 'Verify OTP' }}

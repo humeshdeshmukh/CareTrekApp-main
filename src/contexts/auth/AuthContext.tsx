@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -54,10 +54,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const router = useRouter();
 
   // Check authentication state
-  const checkAuthState = async (): Promise<void> => {
+  const checkAuthState = useCallback(async (): Promise<void> => {
     try {
       setIsLoading(true);
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+      const { 
+        data: { session: currentSession }, 
+        error: sessionError 
+      } = await supabase.auth.getSession();
       
       if (sessionError) {
         throw sessionError;
@@ -72,18 +75,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (userError) throw userError;
 
-        setSession(currentSession);
-        setUser({
-          ...currentSession.user,
-          role: userData?.role || 'guest',
-          displayName: userData?.display_name || null,
-          phoneNumber: userData?.phone_number || null,
-          photoURL: userData?.avatar_url || null,
-          isAnonymous: false,
-        } as AppUser);
+        setUser(prevUser => {
+          const newUser = {
+            ...currentSession.user,
+            role: userData?.role || 'guest',
+            displayName: userData?.display_name || null,
+            phoneNumber: userData?.phone_number || null,
+            photoURL: userData?.avatar_url || null,
+            isAnonymous: false,
+          } as AppUser;
+
+          return JSON.stringify(prevUser) === JSON.stringify(newUser) 
+            ? prevUser 
+            : newUser;
+        });
+        
+        setSession(prevSession => 
+          JSON.stringify(prevSession) === JSON.stringify(currentSession) 
+            ? prevSession 
+            : currentSession
+        );
       } else {
-        setSession(null);
         setUser(null);
+        setSession(null);
       }
     } catch (error) {
       console.error('Error checking auth state:', error);
@@ -92,40 +106,74 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Check for existing session on mount
   useEffect(() => {
-    checkAuthState();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if (currentSession?.user) {
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentSession.user.id)
-          .single();
-
-        if (!userError && userData) {
-          setSession(currentSession);
-          setUser({
-            ...currentSession.user,
-            role: userData.role || 'guest',
-            displayName: userData.display_name || null,
-            phoneNumber: userData.phone_number || null,
-            photoURL: userData.avatar_url || null,
-            isAnonymous: false,
-          } as AppUser);
-        }
-      } else {
-        setSession(null);
-        setUser(null);
+    let mounted = true;
+    
+    // Initial check
+    checkAuthState().finally(() => {
+      if (mounted) {
+        setIsLoading(false);
       }
     });
 
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        if (!mounted) return;
+        
+        try {
+          setIsLoading(true);
+          
+          if (currentSession?.user) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', currentSession.user.id)
+              .single();
+
+            if (!userError && userData) {
+              // Only update if the user data has actually changed
+              setUser(prevUser => {
+                const newUser = {
+                  ...currentSession.user,
+                  role: userData.role || 'guest',
+                  displayName: userData.display_name || null,
+                  phoneNumber: userData.phone_number || null,
+                  photoURL: userData.avatar_url || null,
+                  isAnonymous: false,
+                } as AppUser;
+
+                // Only update if the user data has changed
+                if (JSON.stringify(prevUser) !== JSON.stringify(newUser)) {
+                  return newUser;
+                }
+                return prevUser;
+              });
+              
+              setSession(prevSession => 
+                JSON.stringify(prevSession) === JSON.stringify(currentSession) 
+                  ? prevSession 
+                  : currentSession
+              );
+            }
+          } else {
+            setUser(null);
+            setSession(null);
+          }
+        } catch (error) {
+          console.error('Auth state change error:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    );
+
     return () => {
-      subscription.unsubscribe();
+      mounted = false;
+      subscription?.unsubscribe();
     };
   }, []);
 

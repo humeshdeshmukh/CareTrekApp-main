@@ -83,64 +83,9 @@ export type SeniorStackParamList = {
 };
 
 
-export type RootStackParamList = {
-  // Auth Stack
-  Welcome: undefined;
-  RoleSelection: undefined;
-  FamilySignIn: { email?: string };
-  SeniorAuth: { role?: UserRole };
-  SignIn: { role?: UserRole };
-  SignUp: SignUpParams;
-  ForgotPassword: { email?: string };
-  OTPVerification: { 
-    phoneNumber: string;
-    verificationId: string;
-    role: UserRole;
-    isSignUp?: boolean;
-  };
-  Emergency: { role: UserRole };
-  EditProfile: undefined;
-
-  // Family Stack
-  MainTabs: undefined;
-  SeniorDetail: { seniorId: string };
-  NewConnectSenior: undefined;
-  HealthHistory: { seniorId: string };
-  HomeNew: undefined;
-  AddSenior: undefined;
-  
-  // Modals
-  FilterAlerts: undefined;
-  FilterMessages: undefined;
-  SortSeniors: undefined;
-  SortAlerts: undefined;
-  SortMessages: undefined;
-  
-  // Settings
-  Settings: undefined;
-  ChangePassword: undefined;
-  NotificationSettings: undefined;
-  PrivacyPolicy: undefined;
-  TermsOfService: undefined;
-  HelpCenter: undefined;
-  ContactSupport: undefined;
-  About: undefined;
-  
-  // Senior Stack
-  SeniorHome: undefined;
-  SeniorDashboard: undefined;
-  MedicationReminders: undefined;
-  EmergencyContacts: undefined;
-  SeniorProfile: undefined;
-  
-  // Common
-  WebView: { url: string; title: string };
-  Loading: undefined;
-  NotFound: undefined;
-  ImageViewer: { uri: string };
-  Onboarding: undefined;
-  DeepLink: { url: string };
-};
+// Re-export RootStackParamList from RootNavigator to avoid duplication
+export type { RootStackParamList } from './RootNavigator';
+import type { RootStackParamList } from './RootNavigator';
 
 // Helper types for navigation props
 export type ScreenProps<T extends keyof RootStackParamList> = {

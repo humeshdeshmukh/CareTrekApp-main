@@ -1,109 +1,89 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+// src/contexts/theme/ThemeContext.tsx
+import React, { createContext, useContext, useMemo, ReactNode, useState } from 'react';
+import { ColorValue } from 'react-native';
 
-type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeFonts = {
+  regular?: string;
+  medium?: string;
+  semiBold?: string;
+  bold?: string;
+};
 
-interface ThemeColors {
+export type ThemeColors = {
+  primary: string;
   background: string;
   card: string;
   text: string;
-  textSecondary: string;
-  textTertiary: string;
   border: string;
   notification: string;
-  primary: string;
-  primaryLight: string;
-  primaryDark: string;
-  secondary: string;
-  error: string;
-  success: string;
-  warning: string;
-  danger: string;
-  isDark: boolean;
-}
-
-const LIGHT_THEME: ThemeColors = {
-  background: '#F8F9FC',
-  card: '#FFFFFF',
-  text: '#1A202C',
-  textSecondary: '#4A5568',
-  textTertiary: '#718096',
-  border: '#E2E8F0',
-  notification: '#E53E3E',
-  primary: '#2F855A',
-  primaryLight: '#48BB78',
-  primaryDark: '#276749',
-  secondary: '#4299E1',
-  error: '#E53E3E',
-  success: '#38A169',
-  warning: '#DD6B20',
-  danger: '#E53E3E',
-  isDark: false,
+  textSecondary?: string;
 };
 
-const DARK_THEME: ThemeColors = {
-  background: '#171923',
-  card: '#2D3748',
-  text: '#F7FAFC',
-  textSecondary: '#A0AEC0',
-  textTertiary: '#718096',
-  border: '#4A5568',
-  notification: '#FC8181',
-  primary: '#48BB78',
-  primaryLight: '#68D391',
-  primaryDark: '#2F855A',
-  secondary: '#4299E1',
-  error: '#FC8181',
-  success: '#48BB78',
-  warning: '#F6AD55',
-  danger: '#FC8181',
-  isDark: true,
-};
-
-interface ThemeContextType {
-  theme: ThemeMode;
-  isDark: boolean;
+export type ThemeContextValue = {
   colors: ThemeColors;
-  setTheme: (theme: ThemeMode) => void;
-  toggleTheme: () => void;
-}
+  fonts: ThemeFonts;
+  isDark: boolean;
+  toggleTheme?: () => void;
+};
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const LIGHT_THEME: { colors: ThemeColors; fonts: ThemeFonts } = {
+  colors: {
+    primary: '#2F855A', // Updated to match onboarding green
+    background: '#FFFBEF', // Light beige background from onboarding
+    card: '#ffffff',
+    text: '#1E293B', // Dark slate from onboarding
+    border: '#E2E8F0', // Light gray border
+    notification: '#ff3b30',
+    textSecondary: '#64748B', // Medium gray from onboarding
+  },
+  fonts: {
+    regular: 'System',
+    medium: 'System',
+    semiBold: 'System',
+    bold: 'System',
+  },
+};
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const systemColorScheme = useColorScheme();
-  const [theme, setTheme] = useState<ThemeMode>('system');
+const DARK_THEME: { colors: ThemeColors; fonts: ThemeFonts } = {
+  colors: {
+    primary: '#48BB78', // Brighter green from onboarding dark mode
+    background: '#171923', // Dark background from onboarding
+    card: '#1A202C', // Slightly lighter dark for cards
+    text: '#F8FAFC', // Off-white text
+    border: '#2D3748', // Darker border
+    notification: '#ff3b30',
+    textSecondary: '#94A3B8', // Lighter gray for secondary text
+  },
+  fonts: {
+    regular: 'System',
+    medium: 'System',
+    semiBold: 'System',
+    bold: 'System',
+  },
+};
 
-  const isDarkMode = theme === 'system' 
-    ? systemColorScheme === 'dark' 
-    : theme === 'dark';
+const ThemeContext = createContext<ThemeContextValue>({
+  colors: LIGHT_THEME.colors,
+  fonts: LIGHT_THEME.fonts,
+  isDark: false,
+});
 
-  const colors = isDarkMode ? { ...DARK_THEME, isDark: true } : { ...LIGHT_THEME, isDark: false };
+export const useTheme = () => useContext(ThemeContext);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
+export const ThemeProvider = ({ children }: { children: ReactNode }) => {
+  const [isDark, setIsDark] = useState<boolean>(false);
 
-  return (
-    <ThemeContext.Provider
-      value={{
-        theme,
-        isDark: isDarkMode,
-        colors,
-        setTheme,
-        toggleTheme,
-      }}>
-      {children}
-    </ThemeContext.Provider>
+  const toggleTheme = () => setIsDark((s) => !s);
+
+  const value = useMemo(
+    () => ({
+      colors: isDark ? DARK_THEME.colors : LIGHT_THEME.colors,
+      fonts: isDark ? DARK_THEME.fonts : LIGHT_THEME.fonts,
+      isDark,
+      toggleTheme,
+    }),
+    [isDark]
   );
-};
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
-
-export default ThemeContext;

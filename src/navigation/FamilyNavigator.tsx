@@ -31,6 +31,7 @@ import MessagesScreen from '../screens/family/MessagesScreen';
 import FamilySettingsScreen from '../screens/family/FamilySettingsScreen';
 import HealthHistoryScreen from '../screens/family/HealthHistoryScreen';
 import AddSeniorScreen from '../screens/family/AddSeniorScreen';
+import EditProfileScreen from '../screens/Senior/EditProfileScreen';
 
 // Type definitions for tab navigation
 type FamilyTabParamList = {
@@ -107,13 +108,13 @@ const TabBarButton: React.FC<BottomTabBarButtonProps> = ({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: isFocused ? colors.primaryLight : 'transparent',
+        backgroundColor: isFocused ? `${colors.primary}33` : 'transparent', 
         margin: 4,
         borderRadius: 8,
       }}
       activeOpacity={0.8}
-      // @ts-ignore - Fix for TouchableOpacity type issue
-      {...props}
+      // Fix for TouchableOpacity type issue
+      {...(props as any)}
     >
       {children}
     </TouchableOpacity>
@@ -214,8 +215,6 @@ export const FamilyNavigator = () => {
           elevation: 0,
           shadowOpacity: 0,
         },
-        // Add this to ensure navigation ref is properly set
-        navigationRef: navigationRef,
         headerTintColor: colors.primary,
         headerTitleStyle: {
           fontWeight: '600',
@@ -223,6 +222,8 @@ export const FamilyNavigator = () => {
         cardStyle: { backgroundColor: colors.background },
         cardStyleInterpolator,
       }}
+      // @ts-ignore - navigationRef is a valid prop for Stack.Navigator
+      ref={navigationRef}
     >
       <Stack.Screen 
         name="MainTabs" 
@@ -271,6 +272,14 @@ export const FamilyNavigator = () => {
           title: t('Messages') || 'Messages',
           headerShown: true,
         }} 
+      />
+      <Stack.Screen 
+        name="EditProfile" 
+        component={EditProfileScreen}
+        options={{
+          title: t('Edit Profile') || 'Edit Profile',
+          headerShown: true,
+        }}
       />
     </Stack.Navigator>
   );

@@ -215,6 +215,19 @@ const ProfileScreen: React.FC = () => {
     <View style={[styles.card, { backgroundColor: colors.card, marginTop: 16 }]}>
       <TouchableOpacity
         style={[styles.actionButton, { borderBottomWidth: 1, borderBottomColor: colors.border ? `${colors.border}40` : 'rgba(0,0,0,0.08)' }]}
+        onPress={() => navigation.navigate('Settings', { screen: 'SettingsMain' })}
+      >
+        <View style={styles.actionButtonContent}>
+          <View style={[styles.actionIcon, { backgroundColor: `${colors.primary}15` }]}>
+            <Icon name="translate" size={20} color={colors.primary} />
+          </View>
+          <Text style={[styles.actionButtonText, { color: colors.text }]}>Language</Text>
+        </View>
+        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.actionButton, { borderBottomWidth: 1, borderBottomColor: colors.border ? `${colors.border}40` : 'rgba(0,0,0,0.08)' }]}
         onPress={() => navigation.navigate('Auth', { screen: 'EditProfile' })}
       >
         <View style={styles.actionButtonContent}>

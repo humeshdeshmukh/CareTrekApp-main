@@ -45,7 +45,7 @@ const RoleSelectionScreen = ({ navigation }: { navigation: RoleSelectionScreenNa
       <View style={styles.content}>
         <TouchableOpacity 
           style={[styles.backButton, { borderColor: isDark ? '#4A5568' : '#E2E8F0' }]}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.navigate('Onboarding')}
           activeOpacity={0.7}
         >
           <Text style={[styles.backButtonText, { color: isDark ? '#E2E8F0' : '#4A5568' }]}>

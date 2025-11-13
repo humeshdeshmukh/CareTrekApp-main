@@ -1,121 +1,53 @@
-import React, { useEffect } from 'react';
+// App.tsx
+import React, { useEffect, useState } from 'react';
 import 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { PaperProvider, ActivityIndicator } from 'react-native-paper';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { Provider as ReduxProvider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './src/store/store';
 import { ThemeProvider, useTheme } from './src/contexts/theme/ThemeContext';
 import { TranslationProvider } from './src/contexts/translation/TranslationContext';
-import { AuthProvider, useAuth } from './src/contexts/auth/AuthContext';
-import { View, StyleSheet } from 'react-native';
-import { navigationRef } from './src/navigation/NavigationService';
+import { AuthProvider } from './src/contexts/auth/AuthContext';
+import { View, StyleSheet, ActivityIndicator, StatusBar as RNStatusBar } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { navigationRef, resetNavigation } from './src/services/navigation';
 import linking from './src/navigation/linking';
 import ErrorBoundary, { DefaultFallback } from './src/components/ErrorBoundary';
-import { RootStackParamList } from './src/navigation/types';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { RootStackParamList } from './src/navigation/RootNavigator';
+import { useAppSelector } from './src/store/hooks';
+import RootNavigator from './src/navigation/RootNavigator';
 
-// Import screens
-import WelcomeScreen from './src/screens/WelcomeScreen';
-import RoleSelectionScreen from './src/screens/RoleSelectionScreen';
-import FamilySignInScreen from './src/screens/auth/FamilySignInScreen';
-import SeniorAuthScreen from './src/screens/auth/SeniorAuthScreen';
-import OTPVerificationScreen from './src/screens/auth/OTPVerificationScreen';
-import FamilyNavigator from './src/navigation/FamilyNavigator';
-import { SeniorTabs } from './src/navigation/SeniorTabs';
-import SOSContactsScreen from './src/screens/Senior/SOSContactsScreen';
-
-const Stack = createNativeStackNavigator<RootStackParamList>();
-
-// Auth Navigator - Handles all authentication-related screens
-function AuthNavigator() {
-  const { colors } = useTheme();
-  
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        animation: 'fade',
-      }}
-    >
-      <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
-      <Stack.Screen name="FamilySignIn" component={FamilySignInScreen} />
-      <Stack.Screen name="SeniorAuth" component={SeniorAuthScreen} />
-      <Stack.Screen 
-        name="OTPVerification" 
-        component={OTPVerificationScreen} 
-        options={{
-          headerShown: true,
-          title: 'Verify OTP',
-          headerTintColor: colors.primary,
-        }}
-      />
-    </Stack.Navigator>
-  );
+declare global {
+  namespace ReactNavigation {
+    interface RootParamList extends RootStackParamList {}
+  }
 }
 
-// App Navigator - Handles main app navigation after authentication
-function AppNavigator() {
-  const { colors } = useTheme();
-  const { userRole } = useAuth();
-
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        animation: 'fade',
-      }}
-    >
-      {userRole === 'family' ? (
-        <>
-          <Stack.Screen name="MainTabs" component={FamilyNavigator} />
-        </>
-      ) : (
-        <>
-          <Stack.Screen name="SeniorHome" component={SeniorTabs} />
-          <Stack.Screen 
-            name="SOSContacts" 
-            component={SOSContactsScreen} 
-            options={{
-              headerShown: true,
-              title: 'SOS Contacts',
-              headerBackTitle: 'Back',
-            }}
-          />
-        </>
-      )}
-    </Stack.Navigator>
-  );
-}
-
-// Root Navigator - Switches between Auth and App navigators
-function RootNavigator() {
+const App: React.FC = () => {
   const { colors, isDark } = useTheme();
-  const { isAuthenticated, isLoading, checkAuthState } = useAuth();
+  const { user, isAuthenticated, loading } = useAppSelector((state) => state.auth);
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
 
-  // Check authentication state on mount
   useEffect(() => {
-    checkAuthState();
-  }, []);
+    if (isNavigationReady && !loading) {
+      // Only navigate to authenticated screens if user is authenticated AND has valid data
+      if (isAuthenticated && user && user.id && user.role) {
+        if (user.role === 'senior') {
+          resetNavigation('SeniorTabs');
+        } else if (user.role === 'family') {
+          resetNavigation('FamilyNavigator');
+        }
+      } else {
+        // For unauthenticated users, start with Welcome screen
+        // The flow is: Welcome -> Language -> Onboarding -> RoleSelection -> Auth
+        resetNavigation('Welcome');
+      }
+    }
+  }, [isAuthenticated, user, loading, isNavigationReady]);
 
-  const navTheme = {
-    ...DefaultTheme,
-    colors: {
-      ...DefaultTheme.colors,
-      background: colors.background,
-      card: colors.card,
-      text: colors.text,
-      border: colors.border,
-      notification: colors.notification,
-    },
-  };
-
-  // Show loading indicator while checking auth state
-  if (isLoading) {
+  if (loading && !isNavigationReady) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -124,46 +56,64 @@ function RootNavigator() {
   }
 
   return (
-    <NavigationContainer 
-      ref={navigationRef} 
-      linking={linking}
-      theme={navTheme}
-      fallback={
-        <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      }
-    >
-      {isAuthenticated ? <AppNavigator /> : <AuthNavigator />}
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-    </NavigationContainer>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <RNStatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <ErrorBoundary FallbackComponent={DefaultFallback}>
+        <NavigationContainer
+          ref={navigationRef as React.Ref<NavigationContainerRef<RootStackParamList>>}
+          onReady={() => setIsNavigationReady(true)}
+          linking={linking}
+          fallback={
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          }
+        >
+          <RootNavigator />
+        </NavigationContainer>
+      </ErrorBoundary>
+    </View>
   );
-}
+};
 
-// Main App component
-export default function App() {
+export default function AppWrapper() {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Clear persisted auth state on app startup to ensure clean slate
+    // This prevents stale user data from being loaded
+    const clearPersistedAuth = async () => {
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        // Clear the persisted root state which includes auth
+        await AsyncStorage.removeItem('persist:root');
+        setIsReady(true);
+      } catch (error) {
+        console.error('Error clearing persisted state:', error);
+        setIsReady(true);
+      }
+    };
+
+    clearPersistedAuth();
+  }, []);
+
+  if (!isReady) {
+    return null;
+  }
+
   return (
     <ErrorBoundary FallbackComponent={DefaultFallback}>
       <ReduxProvider store={store}>
-        <PersistGate 
-          loading={
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4a90e2" />
-            </View>
-          } 
-          persistor={persistor}
-        >
+        <PersistGate loading={null} persistor={persistor}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaProvider>
-              <TranslationProvider>
+            <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+              <AuthProvider>
                 <ThemeProvider>
-                  <PaperProvider>
-                    <AuthProvider>
-                      <RootNavigator />
-                    </AuthProvider>
-                  </PaperProvider>
+                  <TranslationProvider>
+                    <App />
+                  </TranslationProvider>
                 </ThemeProvider>
-              </TranslationProvider>
+              </AuthProvider>
             </SafeAreaProvider>
           </GestureHandlerRootView>
         </PersistGate>

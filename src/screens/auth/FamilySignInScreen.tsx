@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -24,6 +24,21 @@ type FamilySignInScreenNavigationProp = StackNavigationProp<RootStackParamList, 
 const FamilySignInScreen = () => {
   const navigation = useNavigation<FamilySignInScreenNavigationProp>();
   const { colors, isDark } = useTheme();
+
+  // Set up header back button
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('RoleSelection')}
+          style={{ marginLeft: 10, padding: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Icon name="arrow-left" size={24} color={colors.primary} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.primary]);
   const { 
     signIn, 
     isLoading: authLoading, 
@@ -152,20 +167,18 @@ const FamilySignInScreen = () => {
   };
 
   const navigateToSignUp = () => {
+    // Navigate directly to the SignUp screen
     navigation.navigate('SignUp', { 
       role: 'family',
       email: email,
       onSuccess: () => {
+        // After successful signup, navigate back to sign in with the email pre-filled
         navigation.navigate('FamilySignIn', { email });
       }
     });
   };
 
-  const navigateToForgotPassword = () => {
-    navigation.navigate('ForgotPassword', { email });
-  };
-
-  return (
+return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
@@ -246,18 +259,7 @@ const FamilySignInScreen = () => {
               )}
             </View>
 
-            {/* Forgot Password */}
-            <TouchableOpacity 
-              style={styles.forgotPassword}
-              onPress={navigateToForgotPassword}
-              disabled={isSubmitting}
-            >
-              <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
-                Forgot Password?
-              </Text>
-            </TouchableOpacity>
-
-            {/* Sign In Button */}
+{/* Sign In Button */}
             <TouchableOpacity
               style={[
                 styles.button,
@@ -344,14 +346,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 20,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
   signUpContainer: {
     flexDirection: 'row',

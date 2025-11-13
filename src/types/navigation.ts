@@ -1,39 +1,19 @@
-export type SeniorTabParamList = {
-  Home: undefined;
-  Map: undefined;
-  Health: undefined;
-  Reminders: undefined;
-  Profile: undefined;
-  SOSContacts: undefined;
-};
+import { RootStackParamList as NavigationRootStackParamList } from '../navigation/types';
 
-export type FamilyTabParamList = {
-  Dashboard: undefined;
-  Map: undefined;
-  Seniors: undefined;
-  Messages: undefined;
-  More: undefined;
-};
+// Extend the RootStackParamList to include all screen names
+declare global {
+  namespace ReactNavigation {
+    interface RootParamList extends NavigationRootStackParamList {
+      // Add any additional screen names here if needed
+    }
+  }
+}
 
-export type AuthStackParamList = {
-  Welcome: undefined;
-  SignIn: undefined;
-  SignUp: undefined;
-  ForgotPassword: undefined;
-  OTPVerification: {
-    phoneNumber: string;
-    verificationId: string;
-    role: 'senior' | 'family';
-    isSignUp: boolean;
-  };
-  EditProfile: undefined;
-};
+// Re-export all types from the navigation module
+export * from '../navigation/types';
 
-export type RootStackParamList = {
-  RoleSelection: undefined;
-  SeniorApp: undefined;
-  FamilyApp: undefined;
-  Auth: { screen: keyof AuthStackParamList };
-  SOSContacts: undefined;
-  // Add other screens here
-};
+// Define the RootStackParamList type that includes all screens
+export type RootStackParamList = NavigationRootStackParamList;
+
+// Define a combined type for all possible screen names
+export type ScreenNames = keyof RootStackParamList;

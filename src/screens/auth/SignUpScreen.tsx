@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -40,8 +40,28 @@ const SignUpScreen: React.FC = () => {
   const navigation = useNavigation<SignUpScreenNavigationProp & any>();
   const route = useRoute<any>();
   const role: 'family' | 'senior' = route?.params?.role ?? 'senior';
-
   const { colors } = useTheme();
+
+  // Set up header back button
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity 
+          onPress={() => {
+            if (role === 'family') {
+              navigation.navigate('FamilySignIn');
+            } else {
+              navigation.goBack();
+            }
+          }}
+          style={{ marginLeft: 10, padding: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Icon name="arrow-left" size={24} color={colors.primary} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, role, colors.primary]);
 
   const validateField = (name: string, value: string) => {
     const newErrors = { ...errors };
@@ -386,7 +406,7 @@ const SignUpScreen: React.FC = () => {
                 <Text style={[styles.loginText, { color: colors.textSecondary }]}>
                   Already have an account?{' '}
                 </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('SignIn')} disabled={isSubmitting}>
+                <TouchableOpacity onPress={() => navigation.navigate('FamilySignIn')} disabled={isSubmitting}>
                   <Text style={[styles.loginLink, { color: colors.primary }]}>Sign In</Text>
                 </TouchableOpacity>
               </View>
