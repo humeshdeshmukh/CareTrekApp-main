@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../contexts/theme/ThemeContext';
-import { useAuth } from '../../contexts/auth/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,7 +26,7 @@ type ProfileItem = {
 };
 
 const ProfileScreen: React.FC = () => {
-  const { user, signOut, deleteAccount } = useAuth();
+  const { user, signOut } = useAuth();
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -70,35 +70,6 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsLoading(true);
-              await deleteAccount();
-              // Navigate to WelcomeScreen after account deletion
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Welcome' }],
-              });
-            } catch (error) {
-              console.error('Delete account error:', error);
-              Alert.alert('Error', 'Failed to delete account. Please try again.');
-            } finally {
-              setIsLoading(false);
-            }
-          },
-        },
-      ],
-    );
-  };
 
   const profileItems: ProfileItem[] = [
     {
@@ -215,7 +186,7 @@ const ProfileScreen: React.FC = () => {
     <View style={[styles.card, { backgroundColor: colors.card, marginTop: 16 }]}>
       <TouchableOpacity
         style={[styles.actionButton, { borderBottomWidth: 1, borderBottomColor: colors.border ? `${colors.border}40` : 'rgba(0,0,0,0.08)' }]}
-        onPress={() => navigation.navigate('Settings', { screen: 'SettingsMain' })}
+        onPress={() => navigation.navigate('Language')}
       >
         <View style={styles.actionButtonContent}>
           <View style={[styles.actionIcon, { backgroundColor: `${colors.primary}15` }]}>
@@ -247,20 +218,6 @@ const ProfileScreen: React.FC = () => {
           <Text style={[styles.actionButtonText, { color: colors.warning || '#FFA000' }]}>{isLoading ? 'Signing Out...' : 'Sign Out'}</Text>
         </View>
         {isLoading ? <ActivityIndicator size="small" color={colors.warning || '#FFA000'} /> : <Icon name="chevron-right" size={20} color={colors.textSecondary} />}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.actionButton, { borderTopWidth: 1, borderTopColor: colors.border ? `${colors.border}40` : 'rgba(0,0,0,0.08)' }]}
-        onPress={handleDeleteAccount}
-        disabled={isLoading}
-      >
-        <View style={styles.actionButtonContent}>
-          <View style={[styles.actionIcon, { backgroundColor: `${colors.danger || '#F44336'}15` }]}>
-            <Icon name="delete" size={20} color={colors.danger || '#F44336'} />
-          </View>
-          <Text style={[styles.actionButtonText, { color: colors.danger || '#F44336' }]}>Delete Account</Text>
-        </View>
-        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
       </TouchableOpacity>
     </View>
   );

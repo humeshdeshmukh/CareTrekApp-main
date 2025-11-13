@@ -22,7 +22,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import * as Haptics from 'expo-haptics';
 
 type ShareOption = {
@@ -38,7 +38,7 @@ const IdShareScreen = () => {
   const navigation = useNavigation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   
-  const seniorId = user?.uid || 'Not Available';
+  const seniorId = user?.id || 'Not Available';
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showCopyOptions, setShowCopyOptions] = useState(false);

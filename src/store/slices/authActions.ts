@@ -1,26 +1,44 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { UserRole } from './authSlice';
+import { supabase } from '../../supabaseConfig';
 
 export const signIn = createAsyncThunk(
   'auth/signIn',
   async ({ email, password, role }: { email: string; password: string; role: UserRole }, { rejectWithValue }) => {
     try {
-      // In a real app, this would be an API call to your backend
-      // For now, we'll simulate a successful login after a short delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock user data - in a real app, this would come from your API
-      const user = {
-        id: '1',
+      // Sign in with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        displayName: email.split('@')[0],
-        role,
-        token: 'mock-jwt-token',
+        password,
+      });
+
+      if (error) {
+        return rejectWithValue(error.message || 'Failed to sign in');
+      }
+
+      if (!data.user) {
+        return rejectWithValue('No user data returned from Supabase');
+      }
+
+      // Get user profile from database
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        console.warn('Could not fetch profile:', profileError);
+      }
+
+      const user = {
+        id: data.user.id, // Use actual Supabase user ID
+        email: data.user.email || email,
+        displayName: profileData?.display_name || email.split('@')[0],
+        role: (profileData?.role as UserRole) || role,
+        token: data.session?.access_token || '',
       };
-      
-      // Save token to AsyncStorage in a real app
-      // await AsyncStorage.setItem('userToken', user.token);
-      
+
       return user;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to sign in');
@@ -36,21 +54,49 @@ export const signUp = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      // In a real app, this would be an API call to your backend
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock user data - in a real app, this would come from your API
-      const user = {
-        id: '1',
+      // Sign up with Supabase
+      const { data, error } = await supabase.auth.signUp({
         email,
+        password,
+        options: {
+          data: {
+            display_name: displayName,
+          },
+        },
+      });
+
+      if (error) {
+        return rejectWithValue(error.message || 'Failed to sign up');
+      }
+
+      if (!data.user) {
+        return rejectWithValue('No user data returned from Supabase');
+      }
+
+      // Create user profile in database
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: data.user.id,
+            display_name: displayName,
+            role: role,
+            email: email,
+          },
+        ]);
+
+      if (profileError) {
+        console.warn('Could not create profile:', profileError);
+      }
+
+      const user = {
+        id: data.user.id, // Use actual Supabase user ID
+        email: data.user.email || email,
         displayName,
         role,
-        token: 'mock-jwt-token',
+        token: data.session?.access_token || '',
       };
-      
-      // Save token to AsyncStorage in a real app
-      // await AsyncStorage.setItem('userToken', user.token);
-      
+
       return user;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to sign up');

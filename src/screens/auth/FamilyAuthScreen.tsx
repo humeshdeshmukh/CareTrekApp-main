@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useTheme } from '../../contexts/theme/ThemeContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../../supabaseConfig';
 
 type FamilyAuthScreenNavigationProp = StackNavigationProp<RootStackParamList, 'FamilyAuth' | 'Auth'>;

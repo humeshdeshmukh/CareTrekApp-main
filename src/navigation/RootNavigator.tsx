@@ -234,17 +234,8 @@ const RootNavigator = () => {
           }}
         />
         
-        {/* Emergency Screen
-        <Stack.Screen 
-          name="Emergency" 
-          component={EmergencyScreen}
-          options={{
-            headerShown: false,
-            gestureEnabled: false,
-          }}
-        />
-        
-        <Stack.Screen name="SOSContacts" component={SOSContactsScreen} /> */}
+        {/* SOSContacts Screen */}
+        <Stack.Screen name="SOSContacts" component={SOSContactsScreen} />
       
       {/* Senior Tabs Navigator */}
       <Stack.Screen 
