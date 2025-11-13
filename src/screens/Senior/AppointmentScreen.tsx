@@ -1,8 +1,29 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, SafeAreaView, StatusBar } from 'react-native';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useNavigation } from '@react-navigation/native';
+
+// Custom Header Component
+const CustomHeader = ({ title, onBack }: { title: string; onBack: () => void }) => {
+  const { colors, isDark } = useTheme();
+  
+  return (
+    <View style={[styles.header, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <TouchableOpacity onPress={onBack} style={styles.backButton}>
+        <Ionicons 
+          name="arrow-back" 
+          size={24} 
+          color={colors.primary} 
+        />
+      </TouchableOpacity>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>{title}</Text>
+      <View style={styles.headerRight} />
+    </View>
+  );
+};
 
 type Appointment = {
   id: string;
@@ -16,6 +37,7 @@ type Appointment = {
 };
 
 const AppointmentScreen = () => {
+  const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -178,33 +200,37 @@ const AppointmentScreen = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {appointments.length > 0 ? (
-        <FlatList
-          data={appointments}
-          renderItem={renderAppointmentItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
-        />
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="calendar" size={64} color={colors.primary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            No appointments scheduled
-          </Text>
-          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-            Tap the + button to add a new appointment
-          </Text>
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[styles.addButton, { backgroundColor: colors.primary }]}
-        onPress={() => setModalVisible(true)}
-      >
-        <Ionicons name="add" size={32} color="white" />
-      </TouchableOpacity>
-
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <CustomHeader 
+        title="My Appointments" 
+        onBack={() => navigation.goBack()} 
+      />
+      <View style={styles.content}>
+        {appointments.length > 0 ? (
+          <FlatList
+            data={appointments}
+            renderItem={renderAppointmentItem}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContainer}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="calendar" size={64} color={colors.primary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              No appointments scheduled
+            </Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+              Tap the + button to add a new appointment
+            </Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: colors.primary }]}
+          onPress={() => setModalVisible(true)}
+        >
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
       <Modal
         animationType="slide"
         transparent={true}
@@ -362,13 +388,40 @@ const AppointmentScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    flex: 1,
+    marginLeft: -24, // To center the title by offsetting the back button
+  },
+  headerRight: {
+    width: 40, // Same as back button for balance
   },
   listContainer: {
     padding: 16,

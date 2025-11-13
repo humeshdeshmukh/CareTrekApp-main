@@ -90,7 +90,6 @@ export type RootStackParamList = {
   
   // Id Share Screen
   IdShare: undefined;
-  Map: undefined;
   Reminders: undefined;
   SOSContacts: undefined;
   Health: undefined;
@@ -98,6 +97,8 @@ export type RootStackParamList = {
   RemindersScreen: undefined;
   MapScreen: undefined;
   IdShareScreen: undefined;
+  Appointments: undefined;
+  Map: undefined;
 };
 
 // Import AuthStackParamList from types
@@ -195,6 +196,42 @@ const RootNavigator = () => {
               borderBottomWidth: 0,
             },
             headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
+          }}
+        />
+
+        {/* Map Screen */}
+        <Stack.Screen
+          name="Map"
+          component={MapScreen}
+          options={{
+            headerShown: false
+          }}
+        />
+
+        {/* IdShare Screen */}
+        <Stack.Screen
+          name="IdShareScreen"
+          component={IdShareScreen}
+          options={{
+            headerShown: false
+          }}
+        />
+
+        {/* Health Screen */}
+        <Stack.Screen
+          name="Health"
+          component={HealthScreen}
+          options={{
+            headerShown: false
+          }}
+        />
+
+        {/* Appointments Screen */}
+        <Stack.Screen
+          name="Appointments"
+          component={require('../screens/Senior/AppointmentScreen').default}
+          options={{
+            headerShown: false
           }}
         />
         
@@ -305,18 +342,7 @@ const RootNavigator = () => {
         name="IdShare" 
         component={IdShareScreen}
         options={{ 
-          title: 'Share ID',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
-            elevation: 0,
-            shadowOpacity: 0,
-            borderBottomWidth: 0,
-          },
-          headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
-          headerTitleStyle: {
-            fontWeight: '600',
-          },
+          headerShown: false
         }}
       />
       

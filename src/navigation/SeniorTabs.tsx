@@ -95,9 +95,9 @@ export const SeniorTabs = () => {
         component={RemindersScreen} 
         options={{ 
           title: 'Reminders',
-          headerShown: true,
-          headerTitle: 'My Reminders',
-          headerTitleAlign: 'center',
+          // headerShown: true,
+          // headerTitle: '',
+          // headerTitleAlign: 'center',
         }} 
       />
       <Tab.Screen 
