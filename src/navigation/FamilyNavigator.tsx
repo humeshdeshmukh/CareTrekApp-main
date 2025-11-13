@@ -39,8 +39,18 @@ import AppointmentScreen from '../screens/Senior/AppointmentScreen';
 type FamilyTabParamList = {
   HomeTab: undefined;
   Seniors: { refresh?: boolean };
-  Medication: { seniorId?: string };
-  Reminders: { seniorId?: string };
+  MedicationTab: {
+    seniorId?: string;
+    seniorName?: string;
+    seniorAvatar?: string;
+    status?: string;
+  };
+  RemindersTab: {
+    seniorId?: string;
+    seniorName?: string;
+    seniorAvatar?: string;
+    status?: string;
+  };
   Settings: undefined;
 };
 
@@ -142,9 +152,9 @@ const TabNavigator = () => {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Seniors') {
             iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Medication') {
+          } else if (route.name === 'MedicationTab') {
             iconName = focused ? 'medkit' : 'medkit-outline';
-          } else if (route.name === 'Reminders') {
+          } else if (route.name === 'RemindersTab') {
             iconName = focused ? 'notifications' : 'notifications-outline';
           } else if (route.name === 'Settings') {
             iconName = focused ? 'settings' : 'settings-outline';
@@ -179,14 +189,28 @@ const TabNavigator = () => {
         options={{ title: t('Seniors') || 'Seniors' }}
       />
       <Tab.Screen
-        name="Medication"
-        component={HomeScreenFamily} // Placeholder - replace with actual Medication screen component
-        options={{ title: t('Medication') || 'Medication' }}
+        name="MedicationTab"
+        component={MedicationScreen}
+        options={{ 
+          title: t('Medication') || 'Medication',
+        }}
+        initialParams={{
+          seniorId: '',
+          seniorName: '',
+          status: 'offline'
+        }}
       />
       <Tab.Screen
-        name="Reminders"
-        component={HomeScreenFamily} // Placeholder - replace with actual Reminders screen component
-        options={{ title: t('Reminders') || 'Reminders' }}
+        name="RemindersTab"
+        component={RemindersScreen}
+        options={{ 
+          title: t('Reminders') || 'Reminders',
+        }}
+        initialParams={{
+          seniorId: '',
+          seniorName: '',
+          status: 'offline'
+        }}
       />
       <Tab.Screen
         name="Settings"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, FlatList, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, FlatList, Image, Alert } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -227,7 +227,19 @@ const HomeScreenFamily = () => {
             {/* Medication */}
             <TouchableOpacity 
               style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#F1F5F9' }]}
-              onPress={() => navigation.navigate('Medication' as never)}
+              onPress={() => {
+                if (connectedSeniors.length > 0) {
+                  navigation.navigate('Medication', { 
+                    seniorId: connectedSeniors[0].id,
+                    seniorName: connectedSeniors[0].name,
+                    seniorAvatar: connectedSeniors[0].avatar_url,
+                    status: connectedSeniors[0].status
+                  });
+                } else {
+                  // Handle case when there are no connected seniors
+                  Alert.alert('No Connected Seniors', 'Please add a senior first.');
+                }
+              }}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#10B981' : '#10B981' }]}>
                 <Ionicons name="medkit" size={20} color="#FFFFFF" />
@@ -240,7 +252,19 @@ const HomeScreenFamily = () => {
             {/* Reminders */}
             <TouchableOpacity 
               style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#F1F5F9' }]}
-              onPress={() => navigation.navigate('Reminders' as never)}
+              onPress={() => {
+                if (connectedSeniors.length > 0) {
+                  navigation.navigate('Reminders', { 
+                    seniorId: connectedSeniors[0].id,
+                    seniorName: connectedSeniors[0].name,
+                    seniorAvatar: connectedSeniors[0].avatar_url,
+                    status: connectedSeniors[0].status
+                  });
+                } else {
+                  // Handle case when there are no connected seniors
+                  Alert.alert('No Connected Seniors', 'Please add a senior first.');
+                }
+              }}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#F59E0B' : '#F59E0B' }]}>
                 <Ionicons name="notifications" size={20} color="#FFFFFF" />
