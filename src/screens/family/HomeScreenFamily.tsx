@@ -20,7 +20,6 @@ type RootStackParamList = {
   AddSenior: undefined;
   HealthHistory: { seniorId: string };
   Alerts: undefined;
-  Messages: undefined;
   SeniorDetail: { seniorId: string };
 };
 
@@ -221,18 +220,6 @@ const HomeScreenFamily = () => {
               </View>
               <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
                 {t('Health')}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#F1F5F9' }]}
-              onPress={() => navigateToScreen('Messages')}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#3B82F6' : '#3B82F6' }]}>
-                <Ionicons name="chatbubbles" size={20} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#1E293B' }]}>
-                {t('Messages')}
               </Text>
             </TouchableOpacity>
             

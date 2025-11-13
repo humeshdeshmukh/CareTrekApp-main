@@ -31,7 +31,6 @@ const HomeScreen = () => {
   const { translatedText: quickActionsText } = useCachedTranslation('Quick Actions', currentLanguage) || 'Quick Actions';
   const { translatedText: medicationText } = useCachedTranslation('Medication', currentLanguage) || 'Medication';
   const { translatedText: appointmentsText } = useCachedTranslation('Appointments', currentLanguage) || 'Appointments';
-  const { translatedText: chatText } = useCachedTranslation('Chat', currentLanguage) || 'Chat';
   const { translatedText: profileText } = useCachedTranslation('Profile', currentLanguage) || 'Profile';
 
   return (
@@ -101,20 +100,7 @@ const HomeScreen = () => {
               </Text>
             </TouchableOpacity>
 
-            {/* Chat */}
-            <TouchableOpacity
-              style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}
-              onPress={() => tabNavigation.navigate('Chat')}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: isDark ? '#3182CE' : '#EBF8FF' }]}>
-                <Ionicons name="chatbubbles" size={24} color={isDark ? '#FFFFFF' : '#3182CE'} />
-              </View>
-              <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#2D3748' }]}>
-                {chatText}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Reminders */}
+{/* Reminders */}
             <TouchableOpacity
               style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}
               onPress={() => tabNavigation.navigate('Reminders')}
@@ -153,7 +139,7 @@ const HomeScreen = () => {
               </Text>
             </TouchableOpacity>
 
-            {/* Profile */}
+            {/* Profile
             <TouchableOpacity
               style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}
               onPress={() => tabNavigation.navigate('Profile')}
@@ -164,7 +150,7 @@ const HomeScreen = () => {
               <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#2D3748' }]}>
                 {profileText}
               </Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
             {/* <TouchableOpacity
               style={[styles.quickAction, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}

@@ -27,7 +27,6 @@ import HomeScreenFamily from '../screens/family/HomeScreenFamily';
 import SeniorsListScreen from '../screens/family/SeniorsListScreen';
 import SeniorDetailScreen from '../screens/family/SeniorDetailScreen';
 import AlertsScreen from '../screens/family/AlertsScreen';
-import MessagesScreen from '../screens/family/MessagesScreen';
 import FamilySettingsScreen from '../screens/family/FamilySettingsScreen';
 import HealthHistoryScreen from '../screens/family/HealthHistoryScreen';
 import AddSeniorScreen from '../screens/family/AddSeniorScreen';
@@ -38,7 +37,6 @@ type FamilyTabParamList = {
   HomeTab: undefined;
   Seniors: { refresh?: boolean };
   Alerts: undefined;
-  MessagesTab: undefined;
   Settings: undefined;
 };
 
@@ -176,17 +174,7 @@ const TabNavigator = () => {
           tabBarLabel: t('Alerts') || 'Alerts',
         }}
       />
-      <Tab.Screen
-        name="MessagesTab"
-        component={MessagesScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles" size={size} color={color} />
-          ),
-          tabBarLabel: t('Messages') || 'Messages',
-        }}
-      />
-      <Tab.Screen
+<Tab.Screen
         name="Settings"
         component={FamilySettingsScreen}
         options={{
@@ -265,15 +253,7 @@ export const FamilyNavigator = () => {
           headerShown: true,
         }} 
       />
-      <Stack.Screen 
-        name="Messages" 
-        component={MessagesScreen} 
-        options={{ 
-          title: t('Messages') || 'Messages',
-          headerShown: true,
-        }} 
-      />
-      <Stack.Screen 
+<Stack.Screen 
         name="EditProfile" 
         component={EditProfileScreen}
         options={{

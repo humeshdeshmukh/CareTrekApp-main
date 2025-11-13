@@ -28,7 +28,6 @@ import HomeScreenFamily from '../screens/family/HomeScreenFamily';
 import AddSeniorScreen from '../screens/family/AddSeniorScreen';
 import SeniorDetailScreen from '../screens/family/SeniorDetailScreen';
 import AlertsScreen from '../screens/family/AlertsScreen';
-import MessagesScreen from '../screens/family/MessagesScreen';
 import FamilySettingsScreen from '../screens/family/FamilySettingsScreen';
 import SeniorsListScreen from '../screens/family/SeniorsListScreen';
 
@@ -370,15 +369,6 @@ const RootNavigator = () => {
         options={{
           headerShown: true,
           title: 'Alerts'
-        }}
-      />
-      
-      <Stack.Screen 
-        name="Messages" 
-        component={MessagesScreen}
-        options={{
-          headerShown: true,
-          title: 'Messages'
         }}
       />
       

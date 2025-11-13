@@ -7,7 +7,6 @@ import { SeniorStackParamList } from '../types/navigation';
 
 export type TabParamList = {
   Home: undefined;
-  Chat: undefined;
   Medication: undefined;
   Reminders: undefined;
   Profile: undefined;
@@ -15,7 +14,6 @@ export type TabParamList = {
 
 // Import screens
 import HomeScreen from '../screens/Senior/HomeScreen';
-import ChatScreen from '../screens/Senior/ChatScreen';
 import RemindersScreen from '../screens/Senior/RemindersScreen';
 import ProfileScreen from '../screens/Senior/ProfileScreen';
 import MedicationScreen from '../screens/Senior/MedicationScreen';
@@ -34,8 +32,6 @@ export const SeniorTabs = () => {
           switch (route.name) {
             case 'Home':
               return <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />;
-            case 'Chat':
-              return <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />;
             case 'Medication':
               return <Ionicons name={focused ? 'medkit' : 'medkit-outline'} size={size} color={color} />;
             case 'Reminders':
@@ -71,16 +67,6 @@ export const SeniorTabs = () => {
         }} 
       />
       <Tab.Screen 
-        name="Chat" 
-        component={ChatScreen} 
-        options={{ 
-          title: 'Chat',
-          headerShown: true,
-          headerTitle: 'Messages',
-          headerTitleAlign: 'center',
-        }} 
-      />
-      <Tab.Screen 
         name="Medication" 
         component={MedicationScreen} 
         options={{ 
@@ -95,9 +81,9 @@ export const SeniorTabs = () => {
         component={RemindersScreen} 
         options={{ 
           title: 'Reminders',
-          // headerShown: true,
-          // headerTitle: '',
-          // headerTitleAlign: 'center',
+          headerShown: true,
+          headerTitle: 'My Reminders',
+          headerTitleAlign: 'center',
         }} 
       />
       <Tab.Screen 
