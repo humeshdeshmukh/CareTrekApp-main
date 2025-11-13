@@ -32,31 +32,54 @@ export const getMedications = async (): Promise<{ data: Medication[] | null; err
 
 export const addMedication = async (medication: Omit<Medication, 'id' | 'created_at' | 'updated_at'> & { user_id: string }): Promise<{ data: Medication | null; error: Error | null }> => {
   try {
-    const { data, error } = await supabase
+    console.log('Adding medication:', medication);
+    
+    // First, insert the medication
+    const { data: insertedData, error: insertError } = await supabase
       .from('medications')
       .insert(medication)
       .select()
       .single();
 
-    if (error) throw error;
-    if (!data) {
-      // If no data is returned, try to fetch the newly inserted medication
-      const { data: newData, error: fetchError } = await supabase
-        .from('medications')
-        .select('*')
-        .eq('name', medication.name)
-        .eq('user_id', medication.user_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (fetchError) throw fetchError;
-      return { data: newData, error: null };
+    if (insertError) {
+      console.error('Insert error:', insertError);
+      throw insertError;
     }
-    return { data, error: null };
+
+    // If we got data back, return it
+    if (insertedData) {
+      console.log('Medication added successfully:', insertedData);
+      return { data: insertedData, error: null };
+    }
+
+    // If no data returned, try to fetch the newly inserted medication
+    console.log('No data returned on insert, attempting to fetch...');
+    const { data: fetchedData, error: fetchError } = await supabase
+      .from('medications')
+      .select('*')
+      .eq('name', medication.name)
+      .eq('user_id', medication.user_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (fetchError) {
+      console.error('Fetch after insert error:', fetchError);
+      throw fetchError;
+    }
+
+    if (!fetchedData) {
+      throw new Error('Failed to retrieve the newly added medication');
+    }
+
+    console.log('Fetched medication after insert:', fetchedData);
+    return { data: fetchedData, error: null };
   } catch (error) {
-    console.error('Error adding medication:', error);
-    return { data: null, error: error as Error };
+    console.error('Error in addMedication:', error);
+    return { 
+      data: null, 
+      error: error instanceof Error ? error : new Error('Unknown error occurred') 
+    };
   }
 };
 

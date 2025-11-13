@@ -132,6 +132,13 @@ const ProfileScreen: React.FC = () => {
       label: 'Account Type',
       value: user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Senior',
       action: () => {},
+    },
+    {
+      icon: 'identifier',
+      label: 'User ID',
+      value: user?.id || 'Not available',
+      copyable: true,
+      action: () => copyToClipboard(user?.id || ''),
     }
   ];
 
@@ -199,15 +206,15 @@ const ProfileScreen: React.FC = () => {
               </View>
             </View>
             
-            {item.label === 'User ID' && (
+            {(item.copyable || item.label === 'User ID') && (
               <TouchableOpacity
                 onPress={() => copyToClipboard(item.value)}
                 style={styles.copyButton}
               >
                 <Icon 
-                  name={copied ? 'check' : 'content-copy'} 
+                  name={copied && item.label === 'User ID' ? 'check' : 'content-copy'} 
                   size={20} 
-                  color={copied ? '#4CAF50' : '#666'}
+                  color={copied && item.label === 'User ID' ? '#4CAF50' : '#666'}
                 />
               </TouchableOpacity>
             )}

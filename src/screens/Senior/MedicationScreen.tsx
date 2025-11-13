@@ -139,26 +139,58 @@ const MedicationScreen = () => {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated. Please sign in again.');
+      return;
+    }
+
     try {
+      console.log('Saving medication with data:', {
+        ...newMedication,
+        user_id: user.id,
+      });
+
       setIsLoading(true);
 
       if (isEditing && editingMedicationId) {
+        console.log('Updating existing medication:', editingMedicationId);
         const { data, error } = await updateMedicationAPI(editingMedicationId, {
           ...newMedication,
-          user_id: user?.id,
+          user_id: user.id,
         });
-        if (error) throw error;
+        
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
+        
         if (data) {
+          console.log('Medication updated successfully:', data);
           setMedications(medications.map(med => (med.id === editingMedicationId ? { ...data } : med)));
+        } else {
+          console.warn('No data returned from update, but no error occurred');
+          // Refresh the list to ensure we have the latest data
+          await fetchMedications();
         }
       } else {
+        console.log('Adding new medication');
         const { data, error } = await addMedicationAPI({
           ...newMedication,
-          user_id: user?.id,
+          user_id: user.id,
         });
-        if (error) throw error;
+        
+        if (error) {
+          console.error('Add error:', error);
+          throw error;
+        }
+        
         if (data) {
-          setMedications([...medications, data]);
+          console.log('Medication added successfully:', data);
+          setMedications(prev => [...prev, data]);
+        } else {
+          console.warn('No data returned from add, but no error occurred');
+          // Refresh the list to ensure we have the latest data
+          await fetchMedications();
         }
       }
 
@@ -166,8 +198,11 @@ const MedicationScreen = () => {
       resetForm();
       Keyboard.dismiss();
     } catch (error) {
-      console.error('Error saving medication:', error);
-      Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'add'} medication. Please try again.`);
+      console.error('Error in handleSaveMedication:', error);
+      Alert.alert(
+        'Error', 
+        `Failed to ${isEditing ? 'update' : 'add'} medication. ${error instanceof Error ? error.message : 'Please try again.'}`
+      );
     } finally {
       setIsLoading(false);
     }
