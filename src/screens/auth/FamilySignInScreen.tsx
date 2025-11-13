@@ -17,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useTheme } from '../../contexts/theme/ThemeContext';
-import { useAuth } from '../../contexts/auth/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 type FamilySignInScreenNavigationProp = StackNavigationProp<RootStackParamList, 'FamilySignIn'>;
 
@@ -41,7 +41,7 @@ const FamilySignInScreen = () => {
   }, [navigation, colors.primary]);
   const { 
     signIn, 
-    isLoading: authLoading, 
+    loading: authLoading, 
     error: authError,
     isAuthenticated,
     role
@@ -136,7 +136,7 @@ const FamilySignInScreen = () => {
       setErrors({});
       
       console.log('Attempting to sign in with:', { email });
-      const { user, error } = await signIn(email, password);
+      const { user, error } = await signIn(email, password, 'family');
       
       if (error) {
         console.error('Sign in error:', error);
@@ -200,9 +200,9 @@ return (
 
             {/* Error Message */}
             {errors.general && (
-              <View style={[styles.errorContainer, { backgroundColor: colors.error + '20' }]}>
-                <Icon name="alert-circle" size={20} color={colors.error} />
-                <Text style={[styles.errorText, { color: colors.error }]}>{errors.general}</Text>
+              <View style={[styles.errorContainer, { backgroundColor: colors.notification + '20' }]}>
+                <Icon name="alert-circle" size={20} color={colors.notification} />
+                <Text style={[styles.errorText, { color: colors.notification }]}>{errors.general}</Text>
               </View>
             )}
 
@@ -213,9 +213,9 @@ return (
                 style={[
                   styles.input, 
                   { 
-                    backgroundColor: isDark ? colors.surface : colors.background,
+                    backgroundColor: isDark ? colors.card : colors.background,
                     color: colors.text,
-                    borderColor: errors.email ? colors.error : colors.border
+                    borderColor: errors.email ? colors.notification : colors.border
                   }
                 ]}
                 placeholder="Enter your email"
@@ -228,7 +228,7 @@ return (
                 editable={!isSubmitting}
               />
               {errors.email && (
-                <Text style={[styles.errorText, { color: colors.error }]}>{errors.email}</Text>
+                <Text style={[styles.errorText, { color: colors.notification }]}>{errors.email}</Text>
               )}
             </View>
 
@@ -240,9 +240,9 @@ return (
                   style={[
                     styles.input, 
                     { 
-                      backgroundColor: isDark ? colors.surface : colors.background,
+                      backgroundColor: isDark ? colors.card : colors.background,
                       color: colors.text,
-                      borderColor: errors.password ? colors.error : colors.border
+                      borderColor: errors.password ? colors.notification : colors.border
                     }
                   ]}
                   placeholder="Enter your password"
@@ -255,11 +255,11 @@ return (
                 />
               </View>
               {errors.password && (
-                <Text style={[styles.errorText, { color: colors.error }]}>{errors.password}</Text>
+                <Text style={[styles.errorText, { color: colors.notification }]}>{errors.password}</Text>
               )}
             </View>
 
-{/* Sign In Button */}
+            {/* Sign In Button */}
             <TouchableOpacity
               style={[
                 styles.button,

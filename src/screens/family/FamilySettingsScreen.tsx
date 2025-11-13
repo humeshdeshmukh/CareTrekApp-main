@@ -22,7 +22,7 @@ import * as Linking from 'expo-linking';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
-import { useAuth } from '../../contexts/auth/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 type SettingsStackParamList = {
   EditProfile: undefined;
@@ -46,10 +46,11 @@ const FamilySettingsScreen = () => {
   const [emergencyAlertsEnabled, setEmergencyAlertsEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(isDark);
   
-  // Get user data from auth context with fallbacks
+  // Get user data from Redux store with fallbacks
   const user = {
     name: authUser?.displayName || authUser?.email?.split('@')[0] || 'User',
     email: authUser?.email || 'No email available',
+    // Use avatar if available, otherwise use a default avatar
     avatar: authUser?.photoURL || undefined,
   };
 
@@ -79,8 +80,10 @@ const FamilySettingsScreen = () => {
 
   const handleSignOut = async () => {
     try {
+      // Call the signOut function from useAuth hook
       await signOut();
-      // Clear user data from Redux
+      
+      // Clear user data from Redux (this might be redundant as the auth slice should handle this)
       dispatch(setUser(null));
       dispatch(clearError());
       
