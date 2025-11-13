@@ -1,5 +1,5 @@
 // src/screens/senior/SOSContactsScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -12,7 +12,9 @@ import {
   Pressable,
   Switch,
   Linking,
-  Platform
+  Platform,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +24,8 @@ import { useTheme } from '../../contexts/theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
+import { useAuth } from '../../hooks/useAuth';
+import { useSOSContacts } from '../../hooks/useSOSContacts';
 
 type ContactType = 'family' | 'police' | 'medical' | 'other';
 
@@ -30,7 +34,7 @@ type SOSContact = {
   name: string;
   phone: string;
   type: ContactType;
-  isEmergency: boolean;
+  is_emergency: boolean;
 };
 
 type SOSNavigationProp = StackNavigationProp<RootStackParamList, 'SOSContacts'>;
@@ -39,6 +43,21 @@ const SOSContactsScreen = () => {
   const navigation = useNavigation<SOSNavigationProp>();
   const { isDark } = useTheme();
   const { currentLanguage } = useTranslation();
+  const { user } = useAuth();
+  const { 
+    contacts, 
+    loading, 
+    error, 
+    saveContact, 
+    deleteContact, 
+    refreshContacts 
+  } = useSOSContacts(user?.id);
+  
+  // Log user ID and contacts when they change
+  useEffect(() => {
+    console.log('User ID:', user?.id);
+    console.log('Contacts from hook:', contacts);
+  }, [user?.id, contacts]);
   
   // Translations
   const { translatedText: backText } = useCachedTranslation('Back', currentLanguage);
@@ -58,45 +77,30 @@ const SOSContactsScreen = () => {
   const { translatedText: deleteText } = useCachedTranslation('Delete', currentLanguage);
   const { translatedText: emergencyContactText } = useCachedTranslation('Emergency Contact', currentLanguage);
 
-  const [contacts, setContacts] = useState<SOSContact[]>([
-    {
-      id: '1',
-      name: 'Local Police',
-      phone: '100',
-      type: 'police',
-      isEmergency: true
-    },
-    {
-      id: '2',
-      name: 'Ambulance',
-      phone: '108',
-      type: 'medical',
-      isEmergency: true
-    },
-    {
-      id: '3',
-      name: 'Fire Department',
-      phone: '101',
-      type: 'other',
-      isEmergency: true
-    }
-  ]);
-
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [currentContact, setCurrentContact] = useState<SOSContact | null>(null);
-  type ContactType = 'family' | 'police' | 'medical' | 'other';
   
   const [formData, setFormData] = useState<{
     name: string;
     phone: string;
     type: ContactType;
-    isEmergency: boolean;
+    is_emergency: boolean;
   }>({
     name: '',
     phone: '',
     type: 'family',
-    isEmergency: false
+    is_emergency: false
   });
+
+  // Show error alert if there's an error and log contacts data
+  useEffect(() => {
+    if (error) {
+      console.error('Error in SOSContactsScreen:', error);
+      Alert.alert('Error', error);
+    }
+    console.log('Current contacts:', contacts);
+    console.log('Loading state:', loading);
+  }, [error, contacts, loading]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -108,7 +112,7 @@ const SOSContactsScreen = () => {
       name: '',
       phone: '',
       type: 'family',
-      isEmergency: false
+      is_emergency: false
     });
     setIsModalVisible(true);
   };
@@ -119,31 +123,37 @@ const SOSContactsScreen = () => {
       name: contact.name,
       phone: contact.phone,
       type: contact.type,
-      isEmergency: contact.isEmergency
+      is_emergency: contact.is_emergency
     });
     setIsModalVisible(true);
   };
 
-  const handleSaveContact = () => {
+  const handleSaveContact = async () => {
     if (!formData.name.trim() || !formData.phone.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    if (currentContact) {
-      // Update existing contact
-      setContacts(contacts.map(contact => 
-        contact.id === currentContact.id ? { ...formData, id: currentContact.id } : contact
-      ));
-    } else {
-      // Add new contact
-      const newContact = {
-        ...formData,
-        id: Date.now().toString()
-      };
-      setContacts([...contacts, newContact]);
+    try {
+      console.log('Saving contact:', formData);
+      if (currentContact) {
+        // Update existing contact
+        console.log('Updating contact with ID:', currentContact.id);
+        const updatedContact = await saveContact(formData, currentContact.id);
+        console.log('Updated contact:', updatedContact);
+      } else {
+        // Add new contact
+        console.log('Adding new contact');
+        const newContact = await saveContact(formData);
+        console.log('Added new contact:', newContact);
+      }
+      setIsModalVisible(false);
+      // Refresh contacts after saving
+      await refreshContacts();
+    } catch (error) {
+      console.error('Error saving contact:', error);
+      Alert.alert('Error', 'Failed to save contact. Please try again.');
     }
-    setIsModalVisible(false);
   };
 
   const handleDeleteContact = (id: string) => {
@@ -158,8 +168,13 @@ const SOSContactsScreen = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setContacts(contacts.filter(contact => contact.id !== id));
+          onPress: async () => {
+            try {
+              await deleteContact(id);
+            } catch (error) {
+              console.error('Error deleting contact:', error);
+              Alert.alert('Error', 'Failed to delete contact. Please try again.');
+            }
           }
         }
       ]
@@ -206,7 +221,7 @@ const SOSContactsScreen = () => {
           {item.type === 'family' ? familyText : 
            item.type === 'police' ? policeText : 
            item.type === 'medical' ? medicalText : otherText}
-          {item.isEmergency ? ` • ${emergencyContactText}` : ''}
+          {item.is_emergency ? ` • ${emergencyContactText}` : ''}
         </Text>
       </View>
       <View style={styles.contactActions}>
@@ -247,12 +262,34 @@ const SOSContactsScreen = () => {
         {emergencyContactsText}
       </Text>
       
-      <FlatList
-        data={contacts}
-        renderItem={renderContact}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={isDark ? '#48BB78' : '#38A169'} />
+        </View>
+      ) : (
+        <FlatList
+          data={contacts}
+          renderItem={renderContact}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="people-outline" size={48} color={isDark ? '#A0AEC0' : '#718096'} />
+              <Text style={[styles.emptyText, { color: isDark ? '#E2E8F0' : '#4A5568' }]}>
+                No contacts found. Add your first contact!
+              </Text>
+            </View>
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refreshContacts}
+              colors={[isDark ? '#48BB78' : '#38A169']}
+              tintColor={isDark ? '#48BB78' : '#38A169'}
+            />
+          }
+        />
+      )}
 
       {/* Add Contact Button */}
       <TouchableOpacity 
@@ -372,8 +409,8 @@ const SOSContactsScreen = () => {
                 {emergencyContactText}
               </Text>
               <Switch
-                value={formData.isEmergency}
-                onValueChange={value => setFormData({...formData, isEmergency: value})}
+                value={formData.is_emergency}
+                onValueChange={value => setFormData({...formData, is_emergency: value})}
                 trackColor={{ false: isDark ? '#4A5568' : '#E2E8F0', true: isDark ? '#48BB78' : '#38A169' }}
                 thumbColor="#FFFFFF"
               />
@@ -388,14 +425,22 @@ const SOSContactsScreen = () => {
                   {cancelText}
                 </Text>
               </Pressable>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: isDark ? '#2F855A' : '#38A169' }]}
+              <TouchableOpacity 
+                style={[styles.modalButton, { 
+                  backgroundColor: isDark ? '#2F855A' : '#38A169',
+                  opacity: loading ? 0.7 : 1
+                }]}
                 onPress={handleSaveContact}
+                disabled={loading}
               >
-                <Text style={[styles.modalButtonText, { color: 'white' }]}>
-                  {saveText}
-                </Text>
-              </Pressable>
+                {loading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={[styles.modalButtonText, { color: 'white' }]}>
+                    {saveText}
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
 
             {currentContact && (
@@ -449,18 +494,34 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 0,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    textAlign: 'center',
+  },
   contactCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     marginBottom: 12,
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
+    elevation: 2,
   },
   contactInfo: {
     flex: 1,
