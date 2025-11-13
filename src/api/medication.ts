@@ -10,6 +10,7 @@ export type Medication = {
   reminder: boolean;
   start_date: string;
   end_date?: string;
+  user_id: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -29,7 +30,7 @@ export const getMedications = async (): Promise<{ data: Medication[] | null; err
   }
 };
 
-export const addMedication = async (medication: Omit<Medication, 'id' | 'created_at' | 'updated_at'>): Promise<{ data: Medication | null; error: Error | null }> => {
+export const addMedication = async (medication: Omit<Medication, 'id' | 'created_at' | 'updated_at'> & { user_id: string }): Promise<{ data: Medication | null; error: Error | null }> => {
   try {
     const { data, error } = await supabase
       .from('medications')
@@ -38,6 +39,20 @@ export const addMedication = async (medication: Omit<Medication, 'id' | 'created
       .single();
 
     if (error) throw error;
+    if (!data) {
+      // If no data is returned, try to fetch the newly inserted medication
+      const { data: newData, error: fetchError } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('name', medication.name)
+        .eq('user_id', medication.user_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      return { data: newData, error: null };
+    }
     return { data, error: null };
   } catch (error) {
     console.error('Error adding medication:', error);
@@ -47,14 +62,22 @@ export const addMedication = async (medication: Omit<Medication, 'id' | 'created
 
 export const updateMedication = async (id: string, updates: Partial<Medication>): Promise<{ data: Medication | null; error: Error | null }> => {
   try {
-    const { data, error } = await supabase
+    // First, update the medication
+    const { error: updateError } = await supabase
       .from('medications')
       .update(updates)
+      .eq('id', id);
+
+    if (updateError) throw updateError;
+
+    // Then fetch the updated medication
+    const { data, error: fetchError } = await supabase
+      .from('medications')
+      .select('*')
       .eq('id', id)
-      .select()
       .single();
 
-    if (error) throw error;
+    if (fetchError) throw fetchError;
     return { data, error: null };
   } catch (error) {
     console.error('Error updating medication:', error);
