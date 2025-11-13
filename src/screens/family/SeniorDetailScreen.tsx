@@ -11,7 +11,11 @@ import {
   Switch,
   ImageSourcePropType,
   Linking,
-  Platform
+  Platform,
+  Alert,
+  FlatList,
+  RefreshControl,
+  TextInput
 } from 'react-native';
 import { Ionicons, MaterialIcons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -20,6 +24,8 @@ import { useTranslation } from '../../contexts/translation/TranslationContext';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
 import { supabase } from '../../lib/supabase';
+import { useSeniorData } from '../../contexts/SeniorDataContext';
+import { useAuth } from '../../hooks/useAuth';
 
 // Default avatar component
 const DefaultAvatar = ({ size = 80 }: { size?: number }) => (
@@ -118,27 +124,125 @@ const NAVIGATION_OPTIONS = [
   }
 ];
 
+type SeniorDataItem = {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: string;
+  createdBy: string;
+  isEditable: boolean;
+};
+
 const SeniorDetailScreen: React.FC = () => {
   // Navigation and theme hooks
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<{ params: { seniorId: string } }>>();
   const { isDark } = useTheme();
   const { currentLanguage } = useTranslation();
+  const { user } = useAuth();
   
   // Translations
   const { translatedText: loadingText } = useCachedTranslation('Loading senior...', currentLanguage);
   const { translatedText: retryText } = useCachedTranslation('Retry', currentLanguage);
   const { translatedText: errorText } = useCachedTranslation('Unable to load senior', currentLanguage);
+  const { translatedText: addNoteText } = useCachedTranslation('Add Note', currentLanguage);
+  const { translatedText: saveText } = useCachedTranslation('Save', currentLanguage);
+  const { translatedText: cancelText } = useCachedTranslation('Cancel', currentLanguage);
   
   // Get seniorId from route params with a default value
   const seniorId = route.params?.seniorId || 'default-senior-id';
   
-  // State hooks in a consistent order
+  // State hooks
   const [senior, setSenior] = useState<SeniorLocal | null>(null);
-  
   const [loading, setLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Use the senior data context
+  const { 
+    seniorData, 
+    loading: dataLoading, 
+    error: dataError, 
+    saveData, 
+    deleteData, 
+    refreshData 
+  } = useSeniorData();
+  
+  // Format the notes data for display
+  const notes = useMemo(() => {
+    if (!seniorData) return [];
+    return seniorData.map(item => ({
+      id: item.id,
+      title: item.data.title || 'Note',
+      description: item.data.description,
+      createdAt: new Date(item.created_at).toLocaleDateString(),
+      createdBy: item.family_member_id === user?.id ? 'You' : 'Senior',
+      isEditable: item.family_member_id === user?.id
+    }));
+  }, [seniorData, user?.id]);
+  
+  // Handle adding a new note
+  const handleAddNote = async () => {
+    if (!newNote.trim()) return;
+    
+    setIsSubmitting(true);
+    try {
+      const noteData = {
+        title: 'Note',
+        description: newNote,
+        type: 'note',
+        createdAt: new Date().toISOString()
+      };
+      
+      await saveData(seniorId, noteData);
+      setNewNote('');
+      setIsAddingNote(false);
+      refreshData();
+    } catch (error) {
+      console.error('Error adding note:', error);
+      Alert.alert('Error', 'Failed to add note. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  // Handle deleting a note
+  const handleDeleteNote = async (id: string) => {
+    try {
+      await deleteData(id);
+      refreshData();
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      Alert.alert('Error', 'Failed to delete note. Please try again.');
+    }
+  };
+  
+  // Render a single note item
+  const renderNoteItem = ({ item }: { item: SeniorDataItem }) => (
+    <View style={[styles.noteCard, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
+      <View style={styles.noteHeader}>
+        <Text style={[styles.noteTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
+          {item.title}
+        </Text>
+        {item.isEditable && (
+          <TouchableOpacity onPress={() => handleDeleteNote(item.id)}>
+            <Ionicons name="trash-outline" size={20} color={isDark ? '#E53E3E' : '#E53E3E'} />
+          </TouchableOpacity>
+        )}
+      </View>
+      <Text style={[styles.noteText, { color: isDark ? '#A0AEC0' : '#4A5568' }]}>
+        {item.description}
+      </Text>
+      <View style={styles.noteFooter}>
+        <Text style={[styles.noteMeta, { color: isDark ? '#718096' : '#A0AEC0' }]}>
+          {item.createdBy} • {item.createdAt}
+        </Text>
+      </View>
+    </View>
+  );
 
   // Status color function with theme support
   const getStatusColor = (status: SeniorLocal['status']) => {
@@ -432,29 +536,38 @@ const SeniorDetailScreen: React.FC = () => {
       }
     };
   });
-
-  // Render the appropriate icon based on the icon set
-  const renderIcon = (iconSet: string, iconName: string, color: string, size: number) => {
-    const iconProps = { name: iconName as any, size, color };
+  
+  // Render icon based on iconSet with proper typing
+  const renderIcon = (icon: string, iconSet?: string, size = 24, color = '#4B5563') => {
+    const iconSize = size as number;
+    const iconColor = color as string;
     
-    if (iconSet === 'Ionicons') {
-      return <Ionicons {...iconProps} />;
-    } else if (iconSet === 'MaterialIcons') {
-      return <MaterialIcons {...iconProps} />;
-    } else if (iconSet === 'MaterialCommunityIcons') {
-      return <MaterialCommunityIcons {...iconProps} />;
-    } else if (iconSet === 'FontAwesome5') {
-      return <FontAwesome5 {...iconProps} />;
+    switch(iconSet) {
+      case 'MaterialIcons':
+        return <MaterialIcons name={icon as any} size={iconSize} color={iconColor} />;
+      case 'MaterialCommunityIcons':
+        return <MaterialCommunityIcons name={icon as any} size={iconSize} color={iconColor} />;
+      case 'FontAwesome5':
+        return <FontAwesome5 name={icon as any} size={iconSize} color={iconColor} />;
+      default:
+        return <Ionicons name="help-circle-outline" size={iconSize} color={iconColor} />;
     }
-    
-    return <Ionicons name="help-circle-outline" size={size} color={color} />;
   };
 
+// ... rest of the code remains the same ...
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }]}>
       <ScrollView 
         contentContainerStyle={[styles.scrollContent, { paddingTop: 16 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={dataLoading}
+            onRefresh={refreshData}
+            colors={[isDark ? '#48BB78' : '#2F855A']}
+            tintColor={isDark ? '#48BB78' : '#2F855A'}
+          />
+        }
       >
 
         {/* Profile Card */}
@@ -597,11 +710,31 @@ const SeniorDetailScreen: React.FC = () => {
             Quick Actions
           </Text>
           <View style={styles.quickActionsGrid}>
-            {navigationOptions.slice(0, 4).map((option) => {
-              const IconComponent = option.iconSet === 'MaterialIcons' ? MaterialIcons :
-                                option.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons :
-                                option.iconSet === 'FontAwesome5' ? FontAwesome5 : Ionicons;
-              
+            {navigationOptions.slice(0, 4).map((option, index) => {
+              const renderNavigationIcon = (option: typeof NAVIGATION_OPTIONS[0]) => {
+                const { icon, color, iconSet } = option;
+                
+                const iconProps = {
+                  name: icon as any, // Using 'as any' to bypass type checking for dynamic icon names
+                  size: 24 as number,
+                  color: color as string
+                };
+                
+                return (
+                  <View style={[styles.quickActionIcon, { backgroundColor: `${color}15` }]}>
+                    {iconSet === 'MaterialIcons' ? (
+                      <MaterialIcons {...iconProps} />
+                    ) : iconSet === 'MaterialCommunityIcons' ? (
+                      <MaterialCommunityIcons {...iconProps} />
+                    ) : iconSet === 'FontAwesome5' ? (
+                      <FontAwesome5 {...iconProps} />
+                    ) : (
+                      <Ionicons {...iconProps} />
+                    )}
+                  </View>
+                );
+              };
+
               return (
                 <TouchableOpacity
                   key={option.id}
@@ -609,13 +742,7 @@ const SeniorDetailScreen: React.FC = () => {
                   onPress={option.onPress}
                   activeOpacity={0.8}
                 >
-                  <View style={[styles.quickActionIcon, { backgroundColor: `${option.color}15` }]}>
-                    <IconComponent 
-                      name={option.icon as any} 
-                      size={24} 
-                      color={option.color} 
-                    />
-                  </View>
+                  {renderNavigationIcon(option)}
                   <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#4B5563' }]}>
                     {option.title}
                   </Text>
@@ -625,6 +752,91 @@ const SeniorDetailScreen: React.FC = () => {
           </View>
         </View>
         
+        {/* Notes Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
+              Notes
+            </Text>
+            <TouchableOpacity 
+              onPress={() => setIsAddingNote(!isAddingNote)}
+              style={styles.addButton}
+            >
+              <Ionicons 
+                name={isAddingNote ? 'close' : 'add'} 
+                size={24} 
+                color={isDark ? '#48BB78' : '#2F855A'} 
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Add Note Form */}
+          {isAddingNote && (
+            <View style={[styles.addNoteContainer, { backgroundColor: isDark ? '#2D3748' : '#F7FAFC' }]}>
+              <TextInput
+                style={[
+                  styles.noteInput,
+                  { 
+                    color: isDark ? '#E2E8F0' : '#1A202C',
+                    borderColor: isDark ? '#4A5568' : '#E2E8F0'
+                  }
+                ]}
+                placeholder="Write your note here..."
+                placeholderTextColor={isDark ? '#718096' : '#A0AEC0'}
+                value={newNote}
+                onChangeText={setNewNote}
+                multiline
+                numberOfLines={3}
+              />
+              <View style={styles.noteActions}>
+                <TouchableOpacity 
+                  style={[styles.cancelButton, { borderColor: isDark ? '#4A5568' : '#E2E8F0' }]}
+                  onPress={() => {
+                    setIsAddingNote(false);
+                    setNewNote('');
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <Text style={{ color: isDark ? '#A0AEC0' : '#4A5568' }}>{cancelText}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.saveButton, { backgroundColor: isDark ? '#48BB78' : '#2F855A' }]}
+                  onPress={handleAddNote}
+                  disabled={!newNote.trim() || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>{saveText}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Notes List */}
+          {notes.length > 0 ? (
+            <FlatList
+              data={notes}
+              renderItem={renderNoteItem}
+              keyExtractor={item => item.id}
+              scrollEnabled={false}
+              contentContainerStyle={styles.notesList}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons 
+                name="document-text-outline" 
+                size={48} 
+                color={isDark ? '#4A5568' : '#A0AEC0'} 
+              />
+              <Text style={[styles.emptyStateText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+                No notes yet. Add your first note!
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Last Seen */}
         <View style={[styles.lastSeenContainer, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }]}>
           <Ionicons 
@@ -667,15 +879,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingContainer: {
-    padding: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
   },
   muted: {
     color: '#64748B',
@@ -955,7 +1167,105 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginLeft: 8,
     fontFamily: 'Inter_500Medium',
-  }
+  },
+  section: {
+    marginTop: 24,
+    marginHorizontal: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  addButton: {
+    padding: 8,
+  },
+  addNoteContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    marginBottom: 12,
+  },
+  noteActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  saveButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  cancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notesList: {
+    gap: 12,
+  },
+  noteCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  noteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  noteTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  noteText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  noteFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  noteMeta: {
+    fontSize: 12,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  emptyStateText: {
+    marginTop: 12,
+    textAlign: 'center',
+  },
 });
 
 export default SeniorDetailScreen;

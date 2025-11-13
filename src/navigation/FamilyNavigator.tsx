@@ -32,6 +32,7 @@ import EditProfileScreen from '../screens/Senior/EditProfileScreen';
 import MedicationScreen from '../screens/Senior/MedicationScreen';
 import RemindersScreen from '../screens/Senior/RemindersScreen';
 import AppointmentScreen from '../screens/Senior/AppointmentScreen';
+import { SeniorDataProvider } from '../contexts/SeniorDataContext';
 
 // Senior Management Screens - Removed as per request
 
@@ -251,8 +252,27 @@ export const FamilyNavigator = () => {
       {/* Senior Management */}
       <Stack.Screen 
         name="SeniorDetail" 
-        component={SeniorDetailScreen} 
-        options={{ title: t('Senior Details') || 'Senior Details' }}
+        component={({ route, navigation }: { route: any; navigation: any }) => (
+          <SeniorDataProvider>
+            <SeniorDetailScreen route={route} navigation={navigation} />
+          </SeniorDataProvider>
+        )}
+        options={({ route }) => ({ 
+          title: 'Senior Details',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: isDark ? '#1A202C' : '#FFFFFF',
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 0,
+          },
+          headerTintColor: isDark ? '#E2E8F0' : '#1A202C',
+          headerTitleStyle: {
+            fontWeight: '600',
+            fontSize: 18,
+          },
+          headerBackTitle: 'Back',
+        })}
       />
       
       {/* Senior Management Screens */}
