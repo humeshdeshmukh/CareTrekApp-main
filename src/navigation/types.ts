@@ -80,8 +80,12 @@ export type SeniorStackParamList = {
   // Help & Support
   HelpCenter: undefined;
   ContactSupport: undefined;
+  
+  // Additional screens
+  Medication: undefined;
+  Appointments: undefined;
+  Chat: undefined;
 };
-
 
 // Re-export RootStackParamList from RootNavigator to avoid duplication
 export type { RootStackParamList } from './RootNavigator';

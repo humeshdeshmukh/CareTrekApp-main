@@ -3,16 +3,24 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/theme/ThemeContext';
-import { SeniorTabParamList } from '../types/navigation';
+import { SeniorStackParamList } from '../types/navigation';
+
+export type TabParamList = {
+  Home: undefined;
+  Chat: undefined;
+  Medication: undefined;
+  Reminders: undefined;
+  Profile: undefined;
+};
 
 // Import screens
 import HomeScreen from '../screens/Senior/HomeScreen';
-import MapScreen from '../screens/Senior/MapScreen';
-import HealthScreen from '../screens/Senior/HealthScreen';
+import ChatScreen from '../screens/Senior/ChatScreen';
 import RemindersScreen from '../screens/Senior/RemindersScreen';
 import ProfileScreen from '../screens/Senior/ProfileScreen';
+import MedicationScreen from '../screens/Senior/MedicationScreen';
 
-const Tab = createBottomTabNavigator<SeniorTabParamList>();
+const Tab = createBottomTabNavigator<TabParamList>();
 
 export const SeniorTabs = () => {
   const { isDark } = useTheme();
@@ -23,28 +31,24 @@ export const SeniorTabs = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'help';
-
           switch (route.name) {
             case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
-            case 'Map':
-              iconName = focused ? 'map' : 'map-outline';
-              break;
-            case 'Health':
-              iconName = focused ? 'heart' : 'heart-outline';
-              break;
+              return <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />;
+            case 'Chat':
+              return <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />;
+            case 'Medication':
+              return <Ionicons name={focused ? 'medkit' : 'medkit-outline'} size={size} color={color} />;
             case 'Reminders':
-              iconName = focused ? 'alarm' : 'alarm-outline';
-              break;
+              return <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={size} color={color} />;
             case 'Profile':
-              iconName = focused ? 'person' : 'person-outline';
-              break;
+              return <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />;
+            default:
+              return <Ionicons name="help" size={size} color={color} />;
           }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
         },
+        tabBarShowLabel: true,
+        tabBarLabelStyle: { fontSize: 12, marginBottom: 4 },
+        tabBarItemStyle: { padding: 4 },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
@@ -58,13 +62,43 @@ export const SeniorTabs = () => {
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-      <Tab.Screen name="Map" component={MapScreen} options={{ title: 'Map' }} />
-      <Tab.Screen name="Health" component={HealthScreen} options={{ title: 'Health' }} />
+      <Tab.Screen 
+        name="Home" 
+        component={HomeScreen} 
+        options={{ 
+          title: 'Home',
+          headerShown: false
+        }} 
+      />
+      <Tab.Screen 
+        name="Chat" 
+        component={ChatScreen} 
+        options={{ 
+          title: 'Chat',
+          headerShown: true,
+          headerTitle: 'Messages',
+          headerTitleAlign: 'center',
+        }} 
+      />
+      <Tab.Screen 
+        name="Medication" 
+        component={MedicationScreen} 
+        options={{ 
+          title: 'Meds',
+          headerShown: true,
+          headerTitle: 'Medication Management',
+          headerTitleAlign: 'center',
+        }} 
+      />
       <Tab.Screen 
         name="Reminders" 
         component={RemindersScreen} 
-        options={{ title: 'Reminders' }} 
+        options={{ 
+          title: 'Reminders',
+          headerShown: true,
+          headerTitle: 'My Reminders',
+          headerTitleAlign: 'center',
+        }} 
       />
       <Tab.Screen 
         name="Profile" 
