@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, SafeAreaView, StatusBar } from 'react-native';
+ import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, SafeAreaView, StatusBar, ActivityIndicator, RefreshControl } from 'react-native';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
+import { Appointment, getAppointments, addAppointment as addAppointmentApi, updateAppointment as updateAppointmentApi, deleteAppointment as deleteAppointmentApi, toggleAppointmentReminder } from '../../api/appointment';
+import { useAuth } from '../../hooks/useAuth';
 
 // Custom Header Component
 const CustomHeader = ({ title, onBack }: { title: string; onBack: () => void }) => {
@@ -25,67 +27,96 @@ const CustomHeader = ({ title, onBack }: { title: string; onBack: () => void }) 
   );
 };
 
-type Appointment = {
-  id: string;
-  title: string;
-  doctor: string;
-  date: Date;
-  time: Date;
-  location: string;
-  notes: string;
-  reminder: boolean;
-};
-
 const AppointmentScreen = () => {
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
+  const { user } = useAuth();
+  
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   
-  const [newAppointment, setNewAppointment] = useState<Partial<Appointment>>({
+  const [newAppointment, setNewAppointment] = useState<Omit<Appointment, 'id' | 'user_id' | 'created_at' | 'updated_at'> & { dateObj: Date, timeObj: Date }>({
     title: '',
     doctor: '',
-    date: new Date(),
-    time: new Date(),
+    date: new Date().toISOString().split('T')[0],
+    time: new Date().toISOString().split('T')[1].substring(0, 5),
+    dateObj: new Date(),
+    timeObj: new Date(),
     location: '',
     notes: '',
     reminder: true,
   });
 
-  const addAppointment = () => {
-    if (!newAppointment.title || !newAppointment.doctor) {
+  // Fetch appointments on mount and when user changes
+  useEffect(() => {
+    if (user?.id) {
+      fetchAppointments();
+    }
+  }, [user?.id]);
+
+  const fetchAppointments = async () => {
+    try {
+      if (!user?.id) return;
+      
+      setRefreshing(true);
+      const { data, error } = await getAppointments(user.id);
+      
+      if (error) throw error;
+      if (data) {
+        setAppointments(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch appointments:', error);
+      Alert.alert('Error', 'Failed to load appointments. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const addAppointment = async () => {
+    if (!newAppointment.title || !newAppointment.doctor || !user?.id) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
-    const appointment: Appointment = {
-      id: Math.random().toString(36).substring(7),
-      title: newAppointment.title || '',
-      doctor: newAppointment.doctor || '',
-      date: newAppointment.date || new Date(),
-      time: newAppointment.time || new Date(),
-      location: newAppointment.location || '',
-      notes: newAppointment.notes || '',
-      reminder: newAppointment.reminder !== false,
-    };
+    try {
+      const { data, error } = await addAppointmentApi({
+        ...newAppointment,
+        user_id: user.id,
+      });
 
-    setAppointments([...appointments, appointment].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime() ||
-      new Date(a.time).getTime() - new Date(b.time).getTime()
-    ));
-    
-    setModalVisible(false);
-    resetForm();
+      if (error) throw error;
+      if (data) {
+        setAppointments(prev => [...prev, data].sort(sortAppointments));
+        setModalVisible(false);
+        resetForm();
+      }
+    } catch (error) {
+      console.error('Failed to add appointment:', error);
+      Alert.alert('Error', 'Failed to add appointment. Please try again.');
+    }
+  };
+
+  const sortAppointments = (a: Appointment, b: Appointment) => {
+    const dateA = new Date(`${a.date}T${a.time}`).getTime();
+    const dateB = new Date(`${b.date}T${b.time}`).getTime();
+    return dateA - dateB;
   };
 
   const resetForm = () => {
+    const now = new Date();
     setNewAppointment({
       title: '',
       doctor: '',
-      date: new Date(),
-      time: new Date(),
+      date: now.toISOString().split('T')[0],
+      time: now.toISOString().split('T')[1].substring(0, 5),
+      dateObj: now,
+      timeObj: now,
       location: '',
       notes: '',
       reminder: true,
@@ -101,26 +132,42 @@ const AppointmentScreen = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setAppointments(appointments.filter(apt => apt.id !== id));
+          onPress: async () => {
+            try {
+              const { error } = await deleteAppointmentApi(id);
+              if (error) throw error;
+              setAppointments(prev => prev.filter(apt => apt.id !== id));
+            } catch (error) {
+              console.error('Failed to delete appointment:', error);
+              Alert.alert('Error', 'Failed to delete appointment. Please try again.');
+            }
           },
         },
       ]
     );
   };
 
-  const toggleReminder = (id: string) => {
-    setAppointments(
-      appointments.map(apt =>
-        apt.id === id ? { ...apt, reminder: !apt.reminder } : apt
-      )
-    );
+  const toggleReminder = async (id: string, currentReminder: boolean) => {
+    try {
+      const { error } = await toggleAppointmentReminder(id, currentReminder);
+      if (error) throw error;
+      
+      setAppointments(prev => 
+        prev.map(apt =>
+          apt.id === id ? { ...apt, reminder: !currentReminder } : apt
+        )
+      );
+    } catch (error) {
+      console.error('Failed to update reminder:', error);
+      Alert.alert('Error', 'Failed to update reminder. Please try again.');
+    }
   };
 
   const renderAppointmentItem = ({ item }: { item: Appointment }) => {
-    const appointmentDate = new Date(item.date);
+    const appointmentDateTime = new Date(`${item.date}T${item.time}`);
     const today = new Date();
-    const isPastAppointment = appointmentDate < today && appointmentDate.toDateString() !== today.toDateString();
+    const isPastAppointment = appointmentDateTime < today && 
+      appointmentDateTime.toDateString() !== today.toDateString();
     
     return (
       <View 
@@ -141,7 +188,7 @@ const AppointmentScreen = () => {
           <View style={styles.appointmentTimeContainer}>
             <Ionicons name="time" size={16} color={colors.textSecondary} />
             <Text style={[styles.appointmentTime, { color: colors.textSecondary }]}>
-              {new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {new Date(`2000-01-01T${item.time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
         </View>
@@ -178,7 +225,7 @@ const AppointmentScreen = () => {
 
         <View style={styles.appointmentActions}>
           <TouchableOpacity 
-            onPress={() => toggleReminder(item.id)}
+            onPress={() => toggleReminder(item.id, item.reminder)}
             style={[styles.actionButton, { backgroundColor: item.reminder ? colors.primary : '#E2E8F0' }]}
           >
             <Ionicons 
@@ -293,13 +340,18 @@ const AppointmentScreen = () => {
 
             {showDatePicker && (
               <DateTimePicker
-                value={newAppointment.date || new Date()}
+                value={newAppointment.dateObj}
                 mode="date"
                 display="default"
                 onChange={(event, selectedDate) => {
                   setShowDatePicker(false);
                   if (selectedDate) {
-                    setNewAppointment({ ...newAppointment, date: selectedDate });
+                    const formattedDate = selectedDate.toISOString().split('T')[0];
+                    setNewAppointment({
+                      ...newAppointment, 
+                      date: formattedDate,
+                      dateObj: selectedDate
+                    });
                   }
                 }}
                 minimumDate={new Date()}
@@ -308,13 +360,19 @@ const AppointmentScreen = () => {
 
             {showTimePicker && (
               <DateTimePicker
-                value={newAppointment.time || new Date()}
+                value={newAppointment.timeObj}
                 mode="time"
                 display="default"
                 onChange={(event, selectedTime) => {
                   setShowTimePicker(false);
                   if (selectedTime) {
-                    setNewAppointment({ ...newAppointment, time: selectedTime });
+                    const hours = selectedTime.getHours().toString().padStart(2, '0');
+                    const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
+                    setNewAppointment({
+                      ...newAppointment, 
+                      time: `${hours}:${minutes}`,
+                      timeObj: selectedTime
+                    });
                   }
                 }}
               />
