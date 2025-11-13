@@ -29,6 +29,9 @@ import SeniorDetailScreen from '../screens/family/SeniorDetailScreen';
 import FamilySettingsScreen from '../screens/family/FamilySettingsScreen';
 import AddSeniorScreen from '../screens/family/AddSeniorScreen';
 import EditProfileScreen from '../screens/Senior/EditProfileScreen';
+import MedicationScreen from '../screens/Senior/MedicationScreen';
+import RemindersScreen from '../screens/Senior/RemindersScreen';
+import AppointmentScreen from '../screens/Senior/AppointmentScreen';
 
 // Senior Management Screens - Removed as per request
 
@@ -49,6 +52,26 @@ type FamilyStackParamList = {
   // Screens
   SeniorDetail: { seniorId: string };
   AddSenior: undefined;
+  
+  // Senior Management Screens
+  Medication: { 
+    seniorId: string; 
+    seniorName?: string; 
+    seniorAvatar?: string; 
+    status?: string 
+  };
+  Reminders: { 
+    seniorId: string; 
+    seniorName?: string; 
+    seniorAvatar?: string; 
+    status?: string 
+  };
+  SeniorAppointments: { 
+    seniorId: string; 
+    seniorName?: string; 
+    seniorAvatar?: string; 
+    status?: string 
+  };
   
   // Settings related
   Settings: undefined;
@@ -207,6 +230,30 @@ export const FamilyNavigator = () => {
         component={SeniorDetailScreen} 
         options={{ title: t('Senior Details') || 'Senior Details' }}
       />
+      
+      {/* Senior Management Screens */}
+      <Stack.Screen 
+        name="Medication" 
+        component={MedicationScreen}
+        options={{ title: t('Medication') || 'Medication' }}
+      />
+      <Stack.Screen 
+        name="Reminders" 
+        component={RemindersScreen}
+        options={{ 
+          title: t('Reminders') || 'Reminders',
+          headerShown: false
+        }}
+      />
+      <Stack.Screen 
+        name="SeniorAppointments" 
+        component={AppointmentScreen}
+        options={{ 
+          title: t('Appointments') || 'Appointments',
+          headerShown: false
+        }}
+      />
+      
       <Stack.Screen 
         name="Settings" 
         component={FamilySettingsScreen} 

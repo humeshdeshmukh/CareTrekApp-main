@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  StatusBar,
+  SafeAreaView,
+  Dimensions
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../contexts/theme/ThemeContext';
@@ -32,9 +35,26 @@ const ProfileScreen: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Use a permissive navigation type for now to avoid TS errors.
-  // Replace `any` with your Stack type (e.g. StackNavigationProp<RootStackParamList, 'Profile'>) if available.
   const navigation = useNavigation<any>();
+  
+  // Set custom header options
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: true,
+      headerTitle: 'My Profile',
+      headerTitleAlign: 'center',
+      headerStyle: {
+        backgroundColor: colors.primary,
+        elevation: 0,
+        shadowOpacity: 0,
+      },
+      headerTintColor: '#fff',
+      headerTitleStyle: {
+        fontWeight: '600',
+        fontSize: 18,
+      },
+    });
+  }, [navigation, colors.primary]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -90,109 +110,113 @@ const ProfileScreen: React.FC = () => {
 
   const profileItems: ProfileItem[] = [
     {
-      icon: 'account',
-      label: 'Name',
+      icon: 'account-circle',
+      label: 'Full Name',
       value: user?.displayName || 'Not set',
       action: () => navigation.navigate('Auth', { screen: 'EditProfile' }),
     },
     {
-      icon: 'email',
-      label: 'Email',
+      icon: 'email-outline',
+      label: 'Email Address',
       value: user?.email || 'Not set',
       action: () => {},
     },
     {
-      icon: 'phone',
-      label: 'Phone',
-      value: user?.phoneNumber || 'Not set',
+      icon: 'phone-outline',
+      label: 'Phone Number',
+      value: (user as any)?.phoneNumber || 'Not provided',
       action: () => {},
     },
     {
-      icon: 'account-group',
-      label: 'Role',
+      icon: 'account-tie',
+      label: 'Account Type',
       value: user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Senior',
       action: () => {},
-    },
-    {
-      icon: 'identifier',
-      label: 'User ID',
-      value: user?.id ? user.id : 'Not available',
-      copyable: true,
-      action: () => {},
-    },
+    }
   ];
 
   const renderProfileHeader = () => (
     <LinearGradient
       colors={[colors.primary, colors.primaryDark || colors.primary]}
       style={styles.headerGradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
     >
       <View style={styles.headerContent}>
         <View style={styles.avatarContainer}>
-          <View style={[styles.avatar, { backgroundColor: colors.card }]}>
-            <Icon name="account" size={60} color={colors.primary} />
+          <View style={[styles.avatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <Icon name="account-circle" size={80} color="#fff" />
           </View>
           <TouchableOpacity
-            style={[styles.editButton, { backgroundColor: `${colors.background}80` }]}
+            style={[styles.editButton, { backgroundColor: 'rgba(255,255,255,0.9)' }]}
             onPress={() => navigation.navigate('Auth', { screen: 'EditProfile' })}
           >
-            <Icon name="pencil" size={16} color={colors.text} />
+            <Icon name="pencil" size={18} color={colors.primary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.userInfo}>
-          <Text style={[styles.name, { color: colors.background }]}>{user?.displayName || 'User'}</Text>
-          <Text style={[styles.email, { color: `${colors.background}CC` }]}>{user?.email || ''}</Text>
+          <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
+            {user?.displayName || 'User'}
+          </Text>
+          <Text style={styles.email} numberOfLines={1} ellipsizeMode="tail">
+            {user?.email || ''}
+          </Text>
         </View>
       </View>
     </LinearGradient>
   );
 
   const renderProfileInfo = () => (
-    <View style={[styles.card, { backgroundColor: colors.card }]}>
-      <Text style={[styles.sectionTitle, { color: colors.primary }]}>Personal Information</Text>
+    <View style={styles.card}>
+      <Text style={styles.sectionTitle}>Personal Information</Text>
 
       {profileItems.map((item, index) => (
         <TouchableOpacity
           key={item.label}
-          style={[
-            styles.detailItem,
-            index !== profileItems.length - 1 && {
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border ? `${colors.border}40` : 'rgba(0,0,0,0.08)',
-            },
-          ]}
+          style={styles.detailItem}
           onPress={item.action}
           activeOpacity={0.7}
         >
           <View style={styles.detailContent}>
             <View style={styles.detailLeft}>
-              <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                <Icon name={item.icon as any} size={20} color={colors.primary} />
+              <View style={styles.iconContainer}>
+                <Icon 
+                  name={item.icon as any} 
+                  size={22} 
+                  color={colors.primary} 
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{item.label}</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]} numberOfLines={1} ellipsizeMode="middle">
+                <Text style={styles.detailLabel}>{item.label}</Text>
+                <Text 
+                  style={styles.detailValue} 
+                  numberOfLines={1} 
+                  ellipsizeMode="tail"
+                >
                   {item.value}
                 </Text>
               </View>
             </View>
-
-            {item.copyable ? (
+            
+            {item.label === 'User ID' && (
               <TouchableOpacity
-                onPress={() => item.value !== 'Not available' && copyToClipboard(item.value)}
+                onPress={() => copyToClipboard(item.value)}
                 style={styles.copyButton}
-                disabled={item.value === 'Not available'}
               >
-                <Icon name={copied ? 'check' : 'content-copy'} size={20} color={copied ? (colors.success || '#4CAF50') : colors.primary} />
+                <Icon 
+                  name={copied ? 'check' : 'content-copy'} 
+                  size={20} 
+                  color={copied ? '#4CAF50' : '#666'}
+                />
               </TouchableOpacity>
-            ) : (
-              <Icon name="chevron-right" size={24} color={colors.textSecondary} />
             )}
           </View>
-
-          {item.copyable && copied && (
-            <Text style={[styles.copiedText, { color: colors.success || '#4CAF50' }]}>Copied to clipboard!</Text>
+          
+          {copied && item.label === 'User ID' && (
+            <Text style={styles.copiedText}>
+              Copied to clipboard!
+            </Text>
           )}
         </TouchableOpacity>
       ))}
@@ -200,124 +224,268 @@ const ProfileScreen: React.FC = () => {
   );
 
   const renderActionButtons = () => (
-    <View style={[styles.card, { backgroundColor: colors.card, marginTop: 16 }]}>
+    <View style={[styles.card, { backgroundColor: '#fff', marginTop: 16 }]}>
       <TouchableOpacity
-        style={[styles.actionButton, { borderBottomWidth: 1, borderBottomColor: colors.border ? `${colors.border}40` : 'rgba(0,0,0,0.08)' }]}
+        style={styles.actionButton}
         onPress={() => navigation.navigate('Language')}
+        activeOpacity={0.7}
       >
         <View style={styles.actionButtonContent}>
-          <View style={[styles.actionIcon, { backgroundColor: `${colors.primary}15` }]}>
-            <Icon name="translate" size={20} color={colors.primary} />
+          <View style={[styles.actionIcon, { backgroundColor: 'rgba(156, 39, 176, 0.1)' }]}>
+            <Icon name="translate" size={22} color="#9C27B0" />
           </View>
-          <Text style={[styles.actionButtonText, { color: colors.text }]}>Language</Text>
+          <Text style={[styles.actionButtonText, { color: '#333' }]}>Language Settings</Text>
         </View>
-        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+        <Icon name="chevron-right" size={22} color="#999" />
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.actionButton, { borderBottomWidth: 1, borderBottomColor: colors.border ? `${colors.border}40` : 'rgba(0,0,0,0.08)' }]}
+        style={styles.actionButton}
         onPress={() => navigation.navigate('Auth', { screen: 'EditProfile' })}
+        activeOpacity={0.7}
       >
         <View style={styles.actionButtonContent}>
-          <View style={[styles.actionIcon, { backgroundColor: `${colors.primary}15` }]}>
-            <Icon name="account-edit" size={20} color={colors.primary} />
+          <View style={[styles.actionIcon, { backgroundColor: 'rgba(33, 150, 243, 0.1)' }]}>
+            <Icon name="account-edit" size={22} color="#2196F3" />
           </View>
-          <Text style={[styles.actionButtonText, { color: colors.text }]}>Edit Profile</Text>
+          <Text style={[styles.actionButtonText, { color: '#333' }]}>Edit Profile</Text>
         </View>
-        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+        <Icon name="chevron-right" size={22} color="#999" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.actionButton} onPress={handleSignOut} disabled={isLoading}>
+      <TouchableOpacity 
+        style={[styles.actionButton, { borderBottomWidth: 0 }]}
+        onPress={handleSignOut} 
+        disabled={isLoading}
+        activeOpacity={0.7}
+      >
         <View style={styles.actionButtonContent}>
-          <View style={[styles.actionIcon, { backgroundColor: `${colors.warning || '#FFA000'}15` }]}>
-            <Icon name="logout" size={20} color={colors.warning || '#FFA000'} />
+          <View style={[styles.actionIcon, { backgroundColor: 'rgba(244, 67, 54, 0.1)' }]}>
+            <Icon name="logout" size={22} color="#F44336" />
           </View>
-          <Text style={[styles.actionButtonText, { color: colors.warning || '#FFA000' }]}>{isLoading ? 'Signing Out...' : 'Sign Out'}</Text>
+          <Text style={[styles.actionButtonText, { color: '#F44336' }]}>
+            {isLoading ? 'Signing Out...' : 'Sign Out'}
+          </Text>
         </View>
-        {isLoading ? <ActivityIndicator size="small" color={colors.warning || '#FFA000'} /> : <Icon name="chevron-right" size={20} color={colors.textSecondary} />}
+        {isLoading ? (
+          <ActivityIndicator size="small" color="#F44336" />
+        ) : (
+          <Icon name="chevron-right" size={22} color="#F44336" />
+        )}
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            colors={[colors.primary]} 
+            tintColor={colors.primary} 
+          />
+        }
       >
         {renderProfileHeader()}
-
         <View style={styles.content}>
           {renderProfileInfo()}
           {renderActionButtons()}
-
-          <Text style={[styles.versionText, { color: colors.textSecondary }]}>CareTrek v1.0.0</Text>
+          <Text style={[styles.versionText, { color: colors.textSecondary }]}>
+            CareTrek v1.0.0
+          </Text>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
+const { width } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  headerGradient: {
-    paddingTop: Platform.OS === 'ios' ? 64 : 60,
-    paddingBottom: 40,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: -20,
+  container: { 
+    flex: 1,
   },
-  headerContent: { alignItems: 'center', paddingHorizontal: 24 },
-  avatarContainer: { position: 'relative', marginBottom: 16 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
+  headerGradient: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    marginBottom: -20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+  },
+  headerContent: { 
+    alignItems: 'center', 
+    paddingHorizontal: 24,
+  },
+  avatarContainer: { 
+    position: 'relative', 
+    marginBottom: 20,
+  },
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   editButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  userInfo: { alignItems: 'center' },
-  name: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-  email: { fontSize: 16, opacity: 0.9 },
-  content: { flex: 1, padding: 16, paddingTop: 0 },
-  card: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderWidth: 0,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 20 },
-  detailItem: { paddingVertical: 12 },
-  detailContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  detailLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  iconContainer: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  detailLabel: { fontSize: 13, marginBottom: 2 },
-  detailValue: { fontSize: 16, fontWeight: '500', maxWidth: '90%' },
-  copyButton: { padding: 8, marginLeft: 8 },
-  copiedText: { fontSize: 12, marginTop: 4, textAlign: 'right' },
-  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, paddingHorizontal: 4 },
-  actionButtonContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  actionIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  actionButtonText: { fontSize: 16, fontWeight: '500' },
-  versionText: { textAlign: 'center', marginTop: 24, marginBottom: 40, fontSize: 12, opacity: 0.6 },
+  userInfo: { 
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 10,
+  },
+  name: { 
+    fontSize: 26, 
+    fontWeight: '700', 
+    marginBottom: 6,
+    color: '#fff',
+    textAlign: 'center',
+    maxWidth: '90%',
+  },
+  email: { 
+    fontSize: 16, 
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    maxWidth: '90%',
+  },
+  content: { 
+    flex: 1, 
+    padding: 20, 
+    paddingTop: 30,
+  },
+  card: {
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  sectionTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    marginBottom: 20,
+    color: '#333',
+    letterSpacing: 0.5,
+  },
+  detailItem: { 
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  detailContent: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+  },
+  detailLeft: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flex: 1,
+    marginRight: 10,
+  },
+  iconContainer: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 12, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginRight: 16,
+    backgroundColor: 'rgba(74, 144, 226, 0.1)',
+  },
+  detailLabel: { 
+    fontSize: 13, 
+    marginBottom: 2,
+    color: '#666',
+    fontWeight: '500',
+  },
+  detailValue: { 
+    fontSize: 16, 
+    fontWeight: '500', 
+    maxWidth: '90%',
+    color: '#222',
+  },
+  copyButton: { 
+    padding: 8, 
+    marginLeft: 8,
+    borderRadius: 8,
+  },
+  copiedText: { 
+    fontSize: 12, 
+    marginTop: 4, 
+    textAlign: 'right',
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  actionButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingVertical: 16, 
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  actionButtonContent: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flex: 1,
+  },
+  actionIcon: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 12, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginRight: 16,
+    backgroundColor: 'rgba(74, 144, 226, 0.1)',
+  },
+  actionButtonText: { 
+    fontSize: 16, 
+    fontWeight: '500',
+    color: '#333',
+  },
+  versionText: { 
+    textAlign: 'center', 
+    marginTop: 30, 
+    marginBottom: 20, 
+    fontSize: 12, 
+    color: '#999',
+    letterSpacing: 0.3,
+  },
 });
 
 export default ProfileScreen;

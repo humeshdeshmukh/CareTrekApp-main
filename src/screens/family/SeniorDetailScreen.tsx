@@ -9,9 +9,11 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Switch,
-  ImageSourcePropType
+  ImageSourcePropType,
+  Linking,
+  Platform
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
@@ -19,8 +21,12 @@ import { useTheme } from '../../contexts/theme/ThemeContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
 import { supabase } from '../../lib/supabase';
 
-// Default image
-const defaultAvatar: ImageSourcePropType = require('../../../assets/icon.png');
+// Default avatar component
+const DefaultAvatar = ({ size = 80 }: { size?: number }) => (
+  <View style={[styles.defaultAvatar, { width: size, height: size, borderRadius: size / 2 }]}>
+    <Ionicons name="person" size={size * 0.6} color="#94A3B8" />
+  </View>
+);
 
 // Theme colors
 const colors = {
@@ -72,33 +78,41 @@ type SeniorLocal = {
 
 type SeniorDetailRouteProp = RouteProp<RootStackParamList, 'SeniorDetail'>;
 
-// Navigation options configuration
+// Navigation options configuration with improved icons and organization
 const NAVIGATION_OPTIONS = [
   {
     id: 'health',
     title: 'Health',
-    icon: 'heart-outline' as const,
+    icon: 'favorite-outline' as const,
+    iconSet: 'MaterialIcons' as const,
+    color: '#EF4444',
     screen: 'Health' as const,
     params: (seniorId: string) => ({ seniorId })
   },
   {
     id: 'medication',
     title: 'Medication',
-    icon: 'medical-outline' as const,
+    icon: 'medical-bag' as const,
+    iconSet: 'MaterialCommunityIcons' as const,
+    color: '#3B82F6',
     screen: 'Medication' as const,
     params: (seniorId: string) => ({ seniorId })
   },
   {
     id: 'reminders',
     title: 'Reminders',
-    icon: 'notifications-outline' as const,
+    icon: 'notifications-none' as const,
+    iconSet: 'MaterialIcons' as const,
+    color: '#F59E0B',
     screen: 'Reminders' as const,
     params: (seniorId: string) => ({ seniorId })
   },
   {
     id: 'appointments',
     title: 'Appointments',
-    icon: 'calendar-outline' as const,
+    icon: 'calendar-month' as const,
+    iconSet: 'MaterialIcons' as const,
+    color: '#8B5CF6',
     screen: 'SeniorAppointments' as const,
     params: (seniorId: string) => ({ seniorId })
   }
@@ -243,15 +257,58 @@ const SeniorDetailScreen: React.FC = () => {
     if (!senior) return;
     
     const newStatus = !isConnected;
+    // Use 'accepted'/'rejected' to match the database constraint
+    const statusValue = newStatus ? 'accepted' : 'rejected';
+    
+    console.log('Toggling connection status:', { 
+      seniorId, 
+      newStatus, 
+      statusValue,
+      currentIsConnected: isConnected 
+    });
     
     try {
-      // Update connection status in the database
-      const { error } = await supabase
+      // First, check the current connection status
+      const { data: currentConnection, error: fetchError } = await supabase
         .from('family_connections')
-        .update({ status: newStatus ? 'active' : 'inactive' })
-        .eq('senior_user_id', seniorId);
+        .select('*')
+        .eq('senior_user_id', seniorId)
+        .single();
+        
+      console.log('Current connection data:', currentConnection);
       
-      if (error) throw error;
+      if (fetchError && !fetchError.message.includes('No rows found')) {
+        console.error('Error fetching current connection:', fetchError);
+        throw fetchError;
+      }
+      
+      // If no connection exists yet, create one
+      if (!currentConnection) {
+        console.log('No existing connection found, creating new one');
+        const { error: insertError } = await supabase
+          .from('family_connections')
+          .insert({
+            senior_user_id: seniorId,
+            family_user_id: user?.id,
+            status: statusValue,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        
+        if (insertError) throw insertError;
+      } else {
+        // Update existing connection
+        console.log('Updating status to:', statusValue);
+        const { error: updateError } = await supabase
+          .from('family_connections')
+          .update({ 
+            status: statusValue,
+            updated_at: new Date().toISOString()
+          })
+          .eq('senior_user_id', seniorId);
+        
+        if (updateError) throw updateError;
+      }
       
       // Update local state
       setIsConnected(newStatus);
@@ -271,13 +328,15 @@ const SeniorDetailScreen: React.FC = () => {
     }
   }, [senior, isConnected, seniorId]);
 
-  // Render loading state if data is being fetched
+  // Render loading state with better visual feedback
   const renderLoading = () => (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" color={isDark ? '#48BB78' : '#2F8550'} />
-      <Text style={[styles.muted, { marginTop: 12, color: isDark ? '#94A3B8' : '#64748B' }]}>
-        {loadingText}
-      </Text>
+    <View style={[styles.centered, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.loadingContainer, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
+        <ActivityIndicator size="large" color={isDark ? '#48BB78' : '#2F8550'} />
+        <Text style={[styles.loadingText, { color: isDark ? '#E2E8F0' : '#4A5568' }]}>
+          {loadingText}
+        </Text>
+      </View>
     </View>
   );
 
@@ -357,7 +416,14 @@ const SeniorDetailScreen: React.FC = () => {
 
   // Navigation options with proper typing
   const navigationOptions = NAVIGATION_OPTIONS.map(option => {
-    const params = option.params(senior.id);
+    const baseParams = option.params(senior.id);
+    const params = {
+      ...baseParams,
+      seniorName: senior.name,
+      seniorAvatar: senior.avatar,
+      status: senior.status
+    };
+    
     return {
       ...option,
       onPress: () => {
@@ -367,141 +433,206 @@ const SeniorDetailScreen: React.FC = () => {
     };
   });
 
+  // Render the appropriate icon based on the icon set
+  const renderIcon = (iconSet: string, iconName: string, color: string, size: number) => {
+    const iconProps = { name: iconName as any, size, color };
+    
+    if (iconSet === 'Ionicons') {
+      return <Ionicons {...iconProps} />;
+    } else if (iconSet === 'MaterialIcons') {
+      return <MaterialIcons {...iconProps} />;
+    } else if (iconSet === 'MaterialCommunityIcons') {
+      return <MaterialCommunityIcons {...iconProps} />;
+    } else if (iconSet === 'FontAwesome5') {
+      return <FontAwesome5 {...iconProps} />;
+    }
+    
+    return <Ionicons name="help-circle-outline" size={size} color={color} />;
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#171923' : '#FFFBEF' }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>
-            {senior.name}'s Profile
-          </Text>
-        </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }]}>
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 16 }]}
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* Profile Card */}
-        <View style={[styles.profileCard, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
-          <View style={styles.avatarContainer}>
-            <View style={[styles.avatarWrapper, { borderColor: isDark ? '#4A5568' : '#E2E8F0' }]}>
-              <Image 
-                source={senior.avatar ? { uri: senior.avatar } : defaultAvatar} 
-                style={styles.avatar} 
-              />
+        <View style={[styles.profileCard, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }]}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarContainer}>
+              {senior.avatar ? (
+                <Image 
+                  source={{ uri: senior.avatar }} 
+                  style={styles.avatar} 
+                />
+              ) : (
+                <DefaultAvatar size={80} />
+              )}
               <View 
                 style={[styles.statusBadge, { 
-                  backgroundColor: getStatusColor(senior.status) 
+                  backgroundColor: getStatusColor(senior.status),
+                  borderColor: isDark ? '#1E293B' : '#FFFFFF'
                 }]} 
               />
             </View>
             
             <View style={styles.profileInfo}>
-              <Text style={[styles.seniorName, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>
-                {senior.name}
-              </Text>
-              <Text style={[styles.relationship, { color: isDark ? '#A0AEC0' : '#64748B' }]}>
-                {senior.relationship}
-              </Text>
+              <View style={styles.nameContainer}>
+                <Text style={[styles.seniorName, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>
+                  {senior.name}
+                </Text>
+                <View style={[styles.relationshipBadge, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]}>
+                  <Text style={[styles.relationship, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                    {senior.relationship}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.connectionStatus}>
+                <View 
+                  style={[styles.statusDot, { 
+                    backgroundColor: getStatusColor(senior.status) 
+                  }]} 
+                />
+                <Text style={[styles.statusText, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                  {senior.status.charAt(0).toUpperCase() + senior.status.slice(1)}
+                </Text>
+              </View>
               
               <View style={styles.connectionSwitch}>
-                <Text style={[styles.connectionText, { color: isDark ? '#E2E8F0' : '#4A5568' }]}>
+                <Text style={[styles.connectionText, { color: isDark ? '#E2E8F0' : '#4B5563' }]}>
                   {isConnected ? 'Connected' : 'Disconnected'}
                 </Text>
                 <Switch
                   value={isConnected}
                   onValueChange={toggleConnection}
-                  trackColor={{ false: '#E2E8F0', true: isDark ? '#48BB78' : '#2F855A' }}
+                  trackColor={{ false: '#E2E8F0', true: isDark ? '#48BB78' : '#10B981' }}
                   thumbColor="#FFFFFF"
                 />
               </View>
-              
-              {/* Contact Information */}
-              <View style={styles.contactInfo}>
-                <Text style={[styles.contactSectionTitle, { color: isDark ? '#E2E8F0' : '#4B5563' }]}>
-                  Contact Information
-                </Text>
-                
-                <View style={[styles.contactItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', padding: 10, borderRadius: 8 }]}>
-                  <View style={[styles.contactIconContainer, { backgroundColor: isDark ? '#2D3748' : '#EDF2F7' }]}>
-                    <Ionicons 
-                      name="mail-outline" 
-                      size={18} 
-                      color={isDark ? '#A0AEC0' : '#4A5568'} 
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.contactLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Email</Text>
-                    <Text style={[styles.contactText, { color: isDark ? '#F8FAFC' : '#1A202C' }]} numberOfLines={1}>
-                      {senior.email || 'Not provided'}
-                    </Text>
-                  </View>
+            </View>
+          </View>
+          
+          {/* Contact Information */}
+          <View style={styles.contactInfo}>
+            <View style={styles.sectionHeader}>
+              <Ionicons 
+                name="call-outline" 
+                size={20} 
+                color={isDark ? '#94A3B8' : '#64748B'} 
+              />
+              <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#4B5563' }]}>
+                Contact
+              </Text>
+            </View>
+            
+            <View style={[styles.contactGrid, { justifyContent: 'flex-start' }]}>
+              <TouchableOpacity 
+                style={[styles.contactItem, { 
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  width: '100%', // Make it full width
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 12,
+                  borderRadius: 12,
+                  marginBottom: 12
+                }]}
+                onPress={() => {
+                  if (senior.phone) {
+                    Linking.openURL(`tel:${senior.phone}`);
+                  }
+                }}
+                disabled={!senior.phone}
+              >
+                <View style={[{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 12,
+                  backgroundColor: isDark ? '#0F172A' : '#EFF6FF'
+                }]}>
+                  <Ionicons 
+                    name="call" 
+                    size={20} 
+                    color={isDark ? '#60A5FA' : '#3B82F6'} 
+                  />
                 </View>
-                
-                <View style={[styles.contactItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', padding: 10, borderRadius: 8 }]}>
-                  <View style={[styles.contactIconContainer, { backgroundColor: isDark ? '#2D3748' : '#EDF2F7' }]}>
-                    <Ionicons 
-                      name="call-outline" 
-                      size={18} 
-                      color={isDark ? '#A0AEC0' : '#4A5568'} 
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.contactLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Phone</Text>
-                    <Text style={[styles.contactText, { color: isDark ? '#F8FAFC' : '#1A202C' }]}>
-                      {senior.phone || 'Not provided'}
-                    </Text>
-                  </View>
+                <View style={{
+                  flex: 1,
+                  marginLeft: 8
+                }}>
+                  <Text style={[{
+                    fontSize: 14,
+                    marginBottom: 2,
+                    color: isDark ? '#94A3B8' : '#64748B'
+                  }]}>
+                    Phone
+                  </Text>
+                  <Text style={[{
+                    fontSize: 16,
+                    fontWeight: '500',
+                    color: isDark ? '#F8FAFC' : '#1E293B'
+                  }]}>
+                    {senior.phone || 'Not provided'}
+                  </Text>
                 </View>
-                
-                <View style={[styles.contactItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)', padding: 10, borderRadius: 8 }]}>
-                  <View style={[styles.contactIconContainer, { backgroundColor: isDark ? '#2D3748' : '#EDF2F7' }]}>
-                    <Ionicons 
-                      name="location-outline" 
-                      size={18} 
-                      color={isDark ? '#A0AEC0' : '#4A5568'} 
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.contactLabel, { color: isDark ? '#A0AEC0' : '#718096' }]}>Address</Text>
-                    <Text style={[styles.contactText, { color: isDark ? '#F8FAFC' : '#1A202C' }]}>
-                      {senior.location || 'Not provided'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
+                {senior.phone && (
+                  <Ionicons 
+                    name="chevron-forward" 
+                    size={20} 
+                    color={isDark ? '#4B5563' : '#9CA3AF'} 
+                  />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* Navigation Options */}
-        <View style={styles.optionsContainer}>
-          {navigationOptions.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={[styles.optionCard, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}
-              onPress={option.onPress}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: isDark ? '#2D3748' : '#F8FAFC' }]}>
-                <Ionicons 
-                  name={option.icon as any} 
-                  size={22} 
-                  color={isDark ? '#48BB78' : '#2F855A'} 
-                />
-              </View>
-              <Text style={[styles.optionText, { color: isDark ? '#F8FAFC' : '#1E293B' }]}>
-                {option.title}
-              </Text>
-              <Ionicons 
-                name="chevron-forward" 
-                size={20} 
-                color={isDark ? '#718096' : '#A0AEC0'} 
-              />
-            </TouchableOpacity>
-          ))}
+        {/* Quick Actions */}
+        <View style={styles.quickActions}>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#4B5563', marginBottom: 12 }]}>
+            Quick Actions
+          </Text>
+          <View style={styles.quickActionsGrid}>
+            {navigationOptions.slice(0, 4).map((option) => {
+              const IconComponent = option.iconSet === 'MaterialIcons' ? MaterialIcons :
+                                option.iconSet === 'MaterialCommunityIcons' ? MaterialCommunityIcons :
+                                option.iconSet === 'FontAwesome5' ? FontAwesome5 : Ionicons;
+              
+              return (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[styles.quickAction, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }]}
+                  onPress={option.onPress}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.quickActionIcon, { backgroundColor: `${option.color}15` }]}>
+                    <IconComponent 
+                      name={option.icon as any} 
+                      size={24} 
+                      color={option.color} 
+                    />
+                  </View>
+                  <Text style={[styles.quickActionText, { color: isDark ? '#E2E8F0' : '#4B5563' }]}>
+                    {option.title}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
         
         {/* Last Seen */}
-        <View style={[styles.lastSeenContainer, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
-          <Ionicons name="time" size={16} color={isDark ? '#A0AEC0' : '#718096'} />
-          <Text style={[styles.lastSeenText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+        <View style={[styles.lastSeenContainer, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }]}>
+          <Ionicons 
+            name="time-outline" 
+            size={16} 
+            color={isDark ? '#94A3B8' : '#64748B'} 
+          />
+          <Text style={[styles.lastSeenText, { color: isDark ? '#94A3B8' : '#64748B' }]}>
             Last active: {formatLastSeen(senior.lastActive)}
           </Text>
         </View>
@@ -529,202 +660,267 @@ const formatLastSeen = (dateString: string) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 24,
-  },
-  header: {
-    padding: 24,
-    paddingBottom: 16,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    fontFamily: 'Inter_700Bold',
+    backgroundColor: '#F8FAFC',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingContainer: {
     padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '500',
   },
   muted: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 12,
-    fontFamily: 'Inter_400Regular',
+    color: '#64748B',
+    fontSize: 14,
   },
   errorText: {
     fontSize: 16,
+    fontWeight: '500',
     textAlign: 'center',
-    marginTop: 8,
-    fontFamily: 'Inter_500Medium',
+    color: '#DC2626',
   },
   button: {
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    marginBottom: 12,
+    backgroundColor: '#4F46E5',
   },
   primaryButton: {
-    shadowColor: '#2F855A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: '#4F46E5',
   },
   buttonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
   },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+  // Header
+  header: {
+    padding: 16,
+    textAlign: 'center',
+    marginRight: 8,
+  },
+  
+  // Profile Card
   profileCard: {
-    marginHorizontal: 24,
-    marginBottom: 16,
+    margin: 16,
     borderRadius: 16,
-    padding: 24,
-    shadowColor: 'rgba(0, 0, 0, 0.05)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
   },
-  avatarContainer: {
+  profileHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  avatarWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: 'rgba(0, 0, 0, 0.1)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 3,
-    backgroundColor: '#F8FAFC',
-    overflow: 'hidden',
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 16,
   },
   avatar: {
-    width: '100%',
-    height: '100%',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  defaultAvatar: {
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
   },
   profileInfo: {
     flex: 1,
-    marginLeft: 20,
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    flexWrap: 'wrap',
   },
   seniorName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
+    marginRight: 8,
     marginBottom: 4,
-    fontFamily: 'Inter_700Bold',
+  },
+  relationshipBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginBottom: 4,
   },
   relationship: {
-    fontSize: 15,
-    marginBottom: 16,
-    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '500',
+    textTransform: 'capitalize',
   },
   connectionSwitch: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
-    padding: 12,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    marginTop: 8,
   },
   connectionText: {
-    fontSize: 15,
-    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  statusBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-  },
+  
+  // Contact Information
   contactInfo: {
     marginTop: 16,
-    width: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.02)',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
   },
-  contactSectionTitle: {
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
-    color: '#4B5563',
+    marginLeft: 8,
+  },
+  contactGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
   },
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 0,
   },
-  contactIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  contactIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
+  contactTextContainer: {
+    flex: 1,
+  },
   contactLabel: {
-    fontSize: 12,
+    fontSize: 14,
     marginBottom: 2,
   },
-  contactText: {
-    fontSize: 14,
+  contactValue: {
+    fontSize: 16,
     fontWeight: '500',
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginVertical: 4,
-    fontFamily: 'Inter_700Bold',
-  },
-  statUnit: {
-    fontSize: 14,
-    fontWeight: '500',
-    opacity: 0.7,
-  },
-  statLabel: {
-    fontSize: 13,
-    marginTop: 2,
-    fontFamily: 'Inter_500Medium',
-  },
-  statDivider: {
-    width: 1,
-    height: '80%',
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    alignSelf: 'center',
-  },
-  // Navigation Options
-  optionsContainer: {
+  
+  // Quick Actions
+  quickActions: {
     marginTop: 8,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
-  optionCard: {
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+    marginBottom: 8,
+  },
+  quickAction: {
+    width: '48%',
+    marginHorizontal: '1%',
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // More Options
+  moreOptions: {
+    margin: 16,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  optionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    backgroundColor: 'rgba(0,0,0,0.02)',
     shadowColor: 'rgba(0, 0, 0, 0.05)',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
