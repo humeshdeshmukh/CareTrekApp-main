@@ -45,6 +45,8 @@ const MedicationScreen = () => {
   const { user } = useAuth();
   const [medications, setMedications] = useState<Medication[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingMedicationId, setEditingMedicationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTime, setSelectedTime] = useState<Date>(new Date());
   const [showTimePicker, setShowTimePicker] = useState<boolean>(false);
@@ -83,28 +85,50 @@ const MedicationScreen = () => {
     fetchMedications();
   }, [fetchMedications]);
 
-  const addMedication = async () => {
+  const handleSaveMedication = async () => {
     if (!newMedication.name || !newMedication.dosage) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
     try {
-      const { data, error } = await addMedicationAPI({
-        ...newMedication,
-        user_id: user?.id || '',
-      } as any); // Cast to any to handle the user_id type
-
-      if (error) throw error;
+      setIsLoading(true);
       
-      if (data) {
-        setMedications([...medications, data]);
-        setModalVisible(false);
-        resetForm();
+      if (isEditing && editingMedicationId) {
+        // Update existing medication
+        const { data, error } = await updateMedicationAPI(editingMedicationId, {
+          ...newMedication,
+          user_id: user?.id,
+        });
+
+        if (error) throw error;
+        
+        if (data) {
+          setMedications(medications.map(med => 
+            med.id === editingMedicationId ? { ...data } : med
+          ));
+        }
+      } else {
+        // Add new medication
+        const { data, error } = await addMedicationAPI({
+          ...newMedication,
+          user_id: user?.id,
+        });
+
+        if (error) throw error;
+        
+        if (data) {
+          setMedications([...medications, data]);
+        }
       }
+
+      setModalVisible(false);
+      resetForm();
     } catch (error) {
-      console.error('Error adding medication:', error);
-      Alert.alert('Error', 'Failed to add medication. Please try again.');
+      console.error('Error saving medication:', error);
+      Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'add'} medication. Please try again.`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -118,6 +142,8 @@ const MedicationScreen = () => {
       reminder: true,
       start_date: new Date().toISOString().split('T')[0],
     });
+    setIsEditing(false);
+    setEditingMedicationId(null);
   };
 
   const deleteMedication = async (id: string) => {
@@ -148,62 +174,150 @@ const MedicationScreen = () => {
     }
   };
 
+  const formatTimeDisplay = (timeString: string) => {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  const handleEditMedication = (medication: Medication) => {
+    setNewMedication({
+      name: medication.name,
+      dosage: medication.dosage,
+      frequency: medication.frequency,
+      instructions: medication.instructions || '',
+      time: medication.time,
+      reminder: medication.reminder,
+      start_date: medication.start_date,
+    });
+    setEditingMedicationId(medication.id);
+    setIsEditing(true);
+    setModalVisible(true);
+  };
+
   const renderMedicationItem = ({ item }: { item: Medication }) => (
     <View style={[styles.medicationItem, { backgroundColor: colors.card }]}>
       <View style={styles.medicationHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.medicationName, { color: colors.primary }]}>{item.name}</Text>
-          <Text style={[styles.medicationDosage, { color: colors.text }]}>{item.dosage}</Text>
-          <Text style={[styles.medicationInfo, { color: colors.text }]}>
-            <Ionicons name="time-outline" size={14} color={colors.text} /> {item.time}
-            {'  •  '}
-            <Ionicons name="repeat-outline" size={14} color={colors.text} /> {item.frequency}
-          </Text>
+        <View style={{ flex: 1, padding: 12 }}>
+          {/* Name and Dosage */}
+          <View style={styles.medicationRow}>
+            <Ionicons name="medkit-outline" size={20} color={colors.primary} style={styles.medicationIcon} />
+            <View>
+              <Text style={[styles.medicationName, { color: colors.primary }]}>{item.name}</Text>
+              <Text style={[styles.medicationDosage, { color: colors.text }]}>{item.dosage}</Text>
+            </View>
+          </View>
+          
+          {/* Time and Frequency */}
+          <View style={[styles.medicationRow, { marginTop: 8 }]}>
+            <View style={styles.medicationInfoItem}>
+              <Ionicons name="time-outline" size={16} color={colors.primary} style={styles.medicationIcon} />
+              <Text style={[styles.medicationInfoText, { color: colors.text }]}>
+                {formatTimeDisplay(item.time)}
+              </Text>
+            </View>
+            
+            <View style={styles.medicationInfoItem}>
+              <Ionicons name="repeat-outline" size={16} color={colors.primary} style={styles.medicationIcon} />
+              <Text style={[styles.medicationInfoText, { color: colors.text }]}>
+                {item.frequency}
+              </Text>
+            </View>
+          </View>
+          
+          {/* Instructions */}
           {item.instructions && (
-            <Text style={[styles.medicationInstructions, { color: colors.text }]}>
-              <Ionicons name="information-circle-outline" size={14} color={colors.text} /> {item.instructions}
-            </Text>
+            <View style={[styles.medicationRow, { marginTop: 8, alignItems: 'flex-start' }]}>
+              <Ionicons name="document-text-outline" size={16} color={colors.primary} style={[styles.medicationIcon, { marginTop: 2 }]} />
+              <Text style={[styles.medicationInstructions, { color: colors.text, flex: 1 }]}>
+                {item.instructions}
+              </Text>
+            </View>
           )}
+          
         </View>
-        <TouchableOpacity
-          onPress={() => toggleReminder(item.id, item.reminder)}
-          style={[
-            styles.reminderButton,
-            { backgroundColor: item.reminder ? colors.primary : colors.background }
-          ]}
-        >
-          <Ionicons
-            name={item.reminder ? 'notifications' : 'notifications-off'}
-            size={20}
-            color={item.reminder ? 'white' : colors.text}
-          />
-        </TouchableOpacity>
-      </View>
-      <Text style={[styles.medicationDetail, { color: colors.textSecondary }]}>
-        {item.frequency} at {item.time}
-      </Text>
-      {item.instructions && (
-        <Text style={[styles.medicationInstructions, { color: colors.text }]}>
-          {item.instructions}
-        </Text>
-      )}
-      <View style={styles.medicationActions}>
-        <TouchableOpacity 
-          onPress={() => toggleReminder(item.id)}
-          style={[styles.actionButton, { backgroundColor: item.reminder ? colors.primary : '#E2E8F0' }]}
-        >
-          <Ionicons 
-            name={item.reminder ? 'checkmark-circle' : 'checkmark-circle-outline'} 
-            size={24} 
-            color={item.reminder ? colors.primary : colors.textSecondary} 
-          />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => deleteMedication(item.id)}
-          style={[styles.actionButton, { backgroundColor: '#FEE2E2' }]}
-        >
-          <Ionicons name="trash" size={20} color="#EF4444" />
-        </TouchableOpacity>
+        
+        {/* Action Buttons Container */}
+        <View style={styles.actionButtonsContainer}>
+          {/* Reminder Toggle */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => toggleReminder(item.id, item.reminder)}
+            style={[
+              styles.actionButton,
+              styles.reminderButton,
+              { 
+                backgroundColor: item.reminder ? colors.primary : 'transparent',
+                borderColor: item.reminder ? colors.primary : colors.border,
+              }
+            ]}
+          >
+            <Ionicons
+              name={item.reminder ? 'notifications' : 'notifications-off'}
+              size={18}
+              color={item.reminder ? 'white' : colors.primary}
+              style={styles.actionButtonIcon}
+            />
+            <Text style={[
+              styles.actionButtonText,
+              { color: item.reminder ? 'white' : colors.primary }
+            ]}>
+              {item.reminder ? 'Reminder On' : 'Reminder Off'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Edit Button */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleEditMedication(item)}
+            style={[styles.actionButton, styles.editButton]}
+          >
+            <Ionicons
+              name="create-outline"
+              size={18}
+              color={colors.primary}
+              style={styles.actionButtonIcon}
+            />
+            <Text style={[styles.actionButtonText, { color: colors.primary }]}>
+              Edit
+            </Text>
+          </TouchableOpacity>
+
+          {/* Delete Button */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              Alert.alert(
+                'Delete Medication',
+                'Are you sure you want to delete this medication?',
+                [
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                  },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => deleteMedication(item.id),
+                  },
+                ],
+                { cancelable: true }
+              );
+            }}
+            style={[styles.actionButton, styles.deleteButton]}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={18}
+              color="#EF4444"
+              style={styles.actionButtonIcon}
+            />
+            <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>
+              Delete
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -524,7 +638,7 @@ const MedicationScreen = () => {
                     shadowRadius: 4,
                     elevation: 4,
                   }]}
-                  onPress={addMedication}
+                  onPress={handleSaveMedication}
                   disabled={isLoading}
                   activeOpacity={0.8}
                 >
@@ -539,7 +653,7 @@ const MedicationScreen = () => {
                         fontWeight: '600',
                         textAlign: 'center'
                       }]}>
-                        Add Medication
+                        {isEditing ? 'Update Medication' : 'Add Medication'}
                       </Text>
                     </View>
                   )}
@@ -566,52 +680,97 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   medicationItem: {
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
+    marginBottom: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.card,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  medicationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  medicationIcon: {
+    marginRight: 12,
+    width: 24,
+    textAlign: 'center',
+  },
+  medicationInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+    marginBottom: 4,
+    backgroundColor: colors.background,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  medicationInfoText: {
+    fontSize: 14,
+    marginLeft: 4,
   },
   medicationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    padding: 16,
+    paddingBottom: 12,
   },
   medicationName: {
     fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
+    fontWeight: '700',
+    marginBottom: 4,
+    color: colors.text,
+    marginRight: 8,
   },
   medicationDosage: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  medicationDetail: {
-    fontSize: 14,
-    marginBottom: 8,
+    fontSize: 15,
+    color: colors.textSecondary,
+    marginBottom: 2,
   },
   medicationInstructions: {
     fontSize: 14,
-    fontStyle: 'italic',
-    marginTop: 8,
+    lineHeight: 20,
   },
   medicationActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 12,
+    justifyContent: 'flex-start',
+    marginTop: 16,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
   },
-  actionButton: {
-    padding: 8,
-    borderRadius: 20,
-    marginLeft: 8,
-    justifyContent: 'center',
+  deleteButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  deleteButtonContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: 40,
-    height: 40,
+    justifyContent: 'center',
+  },
+  deleteIcon: {
+    marginRight: 6,
+  },
+  deleteButtonText: {
+    color: '#EF4444',
+    fontWeight: '600',
+    fontSize: 14,
   },
   emptyContainer: {
     flex: 1,
@@ -788,13 +947,44 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
-  reminderContainer: {
+  actionButtonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
+    padding: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 8,
+    backgroundColor: colors.background,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
   },
-  reminderText: {
-    fontSize: 16,
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    minHeight: 36,
+    minWidth: 36,
+  },
+  reminderButton: {
+    minWidth: 120,
+  },
+  editButton: {
+    borderColor: colors.primary,
+  },
+  deleteButton: {
+    borderColor: '#FECACA',
+  },
+  actionButtonIcon: {
+    marginRight: 6,
+  },
+  actionButtonText: {
+    fontSize: 14,
     fontWeight: '500',
   },
   toggle: {
