@@ -401,7 +401,10 @@ const AppointmentScreen = () => {
 
             <TouchableOpacity
               style={[styles.dateTimeButton, { backgroundColor: colors.background }]}
-              onPress={() => setShowDatePicker(true)}
+              onPress={() => {
+                setShowDatePicker(true);
+                setShowTimePicker(false);
+              }}
             >
               <Ionicons name="calendar" size={20} color={colors.primary} />
               <Text style={[styles.dateTimeButtonText, { color: colors.text }]}>
@@ -418,13 +421,14 @@ const AppointmentScreen = () => {
 
             <TouchableOpacity
               style={[styles.dateTimeButton, { backgroundColor: colors.background }]}
-              onPress={() => setShowTimePicker(true)}
+              onPress={() => {
+                setShowTimePicker(true);
+                setShowDatePicker(false);
+              }}
             >
               <Ionicons name="time" size={20} color={colors.primary} />
               <Text style={[styles.dateTimeButtonText, { color: colors.text }]}>
-                {newAppointment.time ? 
-                  new Date(newAppointment.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  : 'Select Time'}
+                {newAppointment.time || 'Select Time'}
               </Text>
             </TouchableOpacity>
 
@@ -456,11 +460,15 @@ const AppointmentScreen = () => {
                 onChange={(event, selectedTime) => {
                   setShowTimePicker(false);
                   if (selectedTime) {
-                    const hours = selectedTime.getHours().toString().padStart(2, '0');
-                    const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
+                    const hours = selectedTime.getHours();
+                    const minutes = selectedTime.getMinutes();
+                    const period = hours >= 12 ? 'PM' : 'AM';
+                    const displayHours = hours % 12 || 12;
+                    const formattedTime = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+                    
                     setNewAppointment({
-                      ...newAppointment, 
-                      time: `${hours}:${minutes}`,
+                      ...newAppointment,
+                      time: formattedTime,
                       timeObj: selectedTime
                     });
                   }
@@ -721,8 +729,30 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dateTimeButtonText: {
-    marginLeft: 8,
+    marginLeft: 10,
     fontSize: 16,
+  },
+  pickerContainer: {
+    backgroundColor: 'transparent',
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  pickerButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  pickerButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  pickerButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   reminderContainer: {
     flexDirection: 'row',
