@@ -4,14 +4,14 @@ export type Appointment = {
   id: string;
   title: string;
   doctor: string;
-  date: string; // ISO date string
-  time: string; // ISO time string
-  location?: string;
-  notes?: string;
+  date: string; // ISO date string (YYYY-MM-DD)
+  time: string; // 24-hour format (HH:MM)
+  location: string | null;
+  notes: string | null;
   reminder: boolean;
   user_id: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export const getAppointments = async (userId: string): Promise<{ data: Appointment[] | null; error: Error | null }> => {

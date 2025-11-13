@@ -1,5 +1,5 @@
  import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, SafeAreaView, StatusBar, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, SafeAreaView, StatusBar, ActivityIndicator, RefreshControl, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useTheme } from '../../contexts/theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -38,6 +38,8 @@ const AppointmentScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
   
   const [newAppointment, setNewAppointment] = useState<Omit<Appointment, 'id' | 'user_id' | 'created_at' | 'updated_at'> & { dateObj: Date, timeObj: Date }>({
     title: '',
@@ -78,28 +80,86 @@ const AppointmentScreen = () => {
     }
   };
 
-  const addAppointment = async () => {
+  const handleEditAppointment = (appointment: Appointment) => {
+    // Parse the time to ensure it's in HH:MM format
+    const timeParts = appointment.time.split(':');
+    let hours = parseInt(timeParts[0]);
+    const minutes = parseInt(timeParts[1]);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    
+    // Convert to 12-hour format for display
+    const displayHours = hours % 12 || 12;
+    const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    
+    setNewAppointment({
+      title: appointment.title,
+      doctor: appointment.doctor || '',
+      date: appointment.date,
+      time: displayTime, // Use the formatted time
+      dateObj: new Date(appointment.date),
+      timeObj: new Date(`2000-01-01T${appointment.time}:00`),
+      location: appointment.location || '',
+      notes: appointment.notes || '',
+      reminder: appointment.reminder,
+    });
+    setCurrentAppointmentId(appointment.id);
+    setIsEditing(true);
+    setModalVisible(true);
+  };
+
+  const saveAppointment = async () => {
     if (!newAppointment.title || !newAppointment.doctor || !user?.id) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
     try {
-      const { data, error } = await addAppointmentApi({
-        ...newAppointment,
+      // Prepare the appointment data without dateObj and timeObj
+      const appointmentData = {
+        title: newAppointment.title,
+        doctor: newAppointment.doctor,
+        date: newAppointment.date,
+        time: newAppointment.time,
+        location: newAppointment.location,
+        notes: newAppointment.notes,
+        reminder: newAppointment.reminder,
         user_id: user.id,
-      });
+      };
 
-      if (error) throw error;
-      if (data) {
-        setAppointments(prev => [...prev, data].sort(sortAppointments));
-        setModalVisible(false);
-        resetForm();
+      if (isEditing && currentAppointmentId) {
+        // Update existing appointment
+        const { data, error } = await updateAppointmentApi(currentAppointmentId, appointmentData);
+        
+        if (error) throw error;
+        if (data) {
+          setAppointments(prev => 
+            prev.map(apt => apt.id === currentAppointmentId ? data : apt)
+              .sort(sortAppointments)
+          );
+        }
+      } else {
+        // Add new appointment
+        const { data, error } = await addAppointmentApi(appointmentData);
+
+        if (error) throw error;
+        if (data) {
+          setAppointments(prev => [...prev, data].sort(sortAppointments));
+        }
       }
+      
+      setModalVisible(false);
+      resetForm();
     } catch (error) {
-      console.error('Failed to add appointment:', error);
-      Alert.alert('Error', 'Failed to add appointment. Please try again.');
+      console.error('Failed to save appointment:', error);
+      Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'add'} appointment. Please try again.`);
     }
+  };
+
+  const addAppointment = () => {
+    resetForm();
+    setIsEditing(false);
+    setCurrentAppointmentId(null);
+    setModalVisible(true);
   };
 
   const sortAppointments = (a: Appointment, b: Appointment) => {
@@ -110,17 +170,24 @@ const AppointmentScreen = () => {
 
   const resetForm = () => {
     const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    
     setNewAppointment({
       title: '',
       doctor: '',
       date: now.toISOString().split('T')[0],
-      time: now.toISOString().split('T')[1].substring(0, 5),
+      time: displayTime,
       dateObj: now,
       timeObj: now,
       location: '',
       notes: '',
       reminder: true,
     });
+    Keyboard.dismiss();
   };
 
   const deleteAppointment = (id: string) => {
@@ -236,6 +303,12 @@ const AppointmentScreen = () => {
           </TouchableOpacity>
           
           <TouchableOpacity 
+            onPress={() => handleEditAppointment(item)}
+            style={[styles.actionButton, { backgroundColor: '#E0F2FE' }]}
+          >
+            <Ionicons name="pencil" size={20} color="#0EA5E9" />
+          </TouchableOpacity>
+          <TouchableOpacity 
             onPress={() => deleteAppointment(item.id)}
             style={[styles.actionButton, { backgroundColor: '#FEE2E2' }]}
           >
@@ -282,16 +355,33 @@ const AppointmentScreen = () => {
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setModalVisible(false);
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Add Appointment</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+            keyboardVerticalOffset={20}
+          >
+            <ScrollView 
+              style={[styles.modalContent, { backgroundColor: colors.card }]}
+              contentContainerStyle={styles.modalContentContainer}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {isEditing ? 'Edit Appointment' : 'Add Appointment'}
+                </Text>
+                <TouchableOpacity onPress={() => {
+                  Keyboard.dismiss();
+                  setModalVisible(false);
+                }}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
 
             <TextInput
               style={[styles.input, { backgroundColor: colors.background, color: colors.text }]}
@@ -437,14 +527,17 @@ const AppointmentScreen = () => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: colors.primary }]}
-              onPress={addAppointment}
-            >
-              <Text style={styles.saveButtonText}>Save Appointment</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={saveAppointment}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isEditing ? 'Update Appointment' : 'Save Appointment'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );
@@ -590,8 +683,11 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     borderRadius: 12,
-    padding: 20,
     maxHeight: '90%',
+    width: '100%',
+  },
+  modalContentContainer: {
+    padding: 20,
   },
   modalHeader: {
     flexDirection: 'row',
