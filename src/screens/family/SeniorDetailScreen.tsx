@@ -710,18 +710,18 @@ const SeniorDetailScreen: React.FC = () => {
             Quick Actions
           </Text>
           <View style={styles.quickActionsGrid}>
-            {navigationOptions.slice(0, 4).map((option, index) => {
-              const renderNavigationIcon = (option: typeof NAVIGATION_OPTIONS[0]) => {
-                const { icon, color, iconSet } = option;
+            {navigationOptions.slice(0, 4).map((option) => {
+              const renderNavigationIcon = (opt: typeof NAVIGATION_OPTIONS[0]) => {
+                const { icon, color, iconSet } = opt;
                 
                 const iconProps = {
-                  name: icon as any, // Using 'as any' to bypass type checking for dynamic icon names
+                  name: icon as any,
                   size: 24 as number,
                   color: color as string
                 };
                 
                 return (
-                  <View style={[styles.quickActionIcon, { backgroundColor: `${color}15` }]}>
+                  <View key={`icon-${opt.id}`} style={[styles.quickActionIcon, { backgroundColor: `${color}15` }]}>
                     {iconSet === 'MaterialIcons' ? (
                       <MaterialIcons {...iconProps} />
                     ) : iconSet === 'MaterialCommunityIcons' ? (
@@ -752,91 +752,6 @@ const SeniorDetailScreen: React.FC = () => {
           </View>
         </View>
         
-        {/* Notes Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>
-              Notes
-            </Text>
-            <TouchableOpacity 
-              onPress={() => setIsAddingNote(!isAddingNote)}
-              style={styles.addButton}
-            >
-              <Ionicons 
-                name={isAddingNote ? 'close' : 'add'} 
-                size={24} 
-                color={isDark ? '#48BB78' : '#2F855A'} 
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Add Note Form */}
-          {isAddingNote && (
-            <View style={[styles.addNoteContainer, { backgroundColor: isDark ? '#2D3748' : '#F7FAFC' }]}>
-              <TextInput
-                style={[
-                  styles.noteInput,
-                  { 
-                    color: isDark ? '#E2E8F0' : '#1A202C',
-                    borderColor: isDark ? '#4A5568' : '#E2E8F0'
-                  }
-                ]}
-                placeholder="Write your note here..."
-                placeholderTextColor={isDark ? '#718096' : '#A0AEC0'}
-                value={newNote}
-                onChangeText={setNewNote}
-                multiline
-                numberOfLines={3}
-              />
-              <View style={styles.noteActions}>
-                <TouchableOpacity 
-                  style={[styles.cancelButton, { borderColor: isDark ? '#4A5568' : '#E2E8F0' }]}
-                  onPress={() => {
-                    setIsAddingNote(false);
-                    setNewNote('');
-                  }}
-                  disabled={isSubmitting}
-                >
-                  <Text style={{ color: isDark ? '#A0AEC0' : '#4A5568' }}>{cancelText}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.saveButton, { backgroundColor: isDark ? '#48BB78' : '#2F855A' }]}
-                  onPress={handleAddNote}
-                  disabled={!newNote.trim() || isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <Text style={styles.saveButtonText}>{saveText}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* Notes List */}
-          {notes.length > 0 ? (
-            <FlatList
-              data={notes}
-              renderItem={renderNoteItem}
-              keyExtractor={item => item.id}
-              scrollEnabled={false}
-              contentContainerStyle={styles.notesList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons 
-                name="document-text-outline" 
-                size={48} 
-                color={isDark ? '#4A5568' : '#A0AEC0'} 
-              />
-              <Text style={[styles.emptyStateText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-                No notes yet. Add your first note!
-              </Text>
-            </View>
-          )}
-        </View>
-
         {/* Last Seen */}
         <View style={[styles.lastSeenContainer, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' }]}>
           <Ionicons 
