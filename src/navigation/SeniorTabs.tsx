@@ -71,9 +71,7 @@ export const SeniorTabs = () => {
         component={MedicationScreen} 
         options={{ 
           title: 'Meds',
-          headerShown: true,
-          headerTitle: 'Medication Management',
-          headerTitleAlign: 'center',
+          headerShown: false
         }} 
       />
       <Tab.Screen 
@@ -81,9 +79,7 @@ export const SeniorTabs = () => {
         component={RemindersScreen} 
         options={{ 
           title: 'Reminders',
-          headerShown: true,
-          headerTitle: 'My Reminders',
-          headerTitleAlign: 'center',
+          headerShown: false
         }} 
       />
       <Tab.Screen 
@@ -91,9 +87,7 @@ export const SeniorTabs = () => {
         component={ProfileScreen} 
         options={{ 
           title: 'Profile',
-          headerShown: true,
-          headerTitle: 'My Profile',
-          headerTitleAlign: 'center',
+          headerShown: false
         }} 
       />
     </Tab.Navigator>
