@@ -8,7 +8,6 @@ import {
   TouchableOpacity, 
   SafeAreaView,
   Alert,
-  Platform,
   Image
 } from 'react-native';
 import { CommonActions, useNavigation } from '@react-navigation/native';
@@ -24,9 +23,10 @@ import { useTranslation } from '../../contexts/translation/TranslationContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
 import { useAuth } from '../../hooks/useAuth';
 
+import { FamilyStackParamList } from '../../navigation/FamilyNavigator';
+
 type SettingsStackParamList = {
   EditProfile: undefined;
-  NotificationSettings: undefined;
   PrivacyPolicy: undefined;
   TermsOfService: undefined;
   HelpCenter: undefined;
@@ -41,9 +41,6 @@ const FamilySettingsScreen = () => {
   const { currentLanguage } = useTranslation();
   const { user: authUser, signOut } = useAuth();
   
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [locationSharingEnabled, setLocationSharingEnabled] = useState(true);
-  const [emergencyAlertsEnabled, setEmergencyAlertsEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(isDark);
   
   // Get user data from Redux store with fallbacks
@@ -58,12 +55,8 @@ const FamilySettingsScreen = () => {
   const { translatedText: settingsText } = useCachedTranslation('Settings', currentLanguage);
   const { translatedText: accountText } = useCachedTranslation('Account', currentLanguage);
   const { translatedText: editProfileText } = useCachedTranslation('Edit Profile', currentLanguage);
-  const { translatedText: notificationSettingsText } = useCachedTranslation('Notification Settings', currentLanguage);
   const { translatedText: preferencesText } = useCachedTranslation('Preferences', currentLanguage);
   const { translatedText: darkModeText } = useCachedTranslation('Dark Mode', currentLanguage);
-  const { translatedText: notificationsText } = useCachedTranslation('Notifications', currentLanguage);
-  const { translatedText: locationSharingText } = useCachedTranslation('Location Sharing', currentLanguage);
-  const { translatedText: emergencyAlertsText } = useCachedTranslation('Emergency Alerts', currentLanguage);
   const { translatedText: supportText } = useCachedTranslation('Support', currentLanguage);
   const { translatedText: helpCenterText } = useCachedTranslation('Help Center', currentLanguage);
   const { translatedText: contactSupportText } = useCachedTranslation('Contact Support', currentLanguage);
@@ -220,132 +213,86 @@ const FamilySettingsScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#1A202C' : '#F7FAFC' }]}>
       <ScrollView contentContainerStyle={styles.scrollView}>
-        {/* Profile Header */}
-        <View style={[styles.profileHeader, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
-          <View style={styles.avatarContainer}>
-            {user.avatar ? (
-              <Image 
-                source={{ uri: user.avatar }} 
-                style={styles.avatarImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={[styles.avatarFallback, { backgroundColor: colors.primary }]}>
-                <Text style={styles.avatarText}>{getUserInitials(user.name)}</Text>
-              </View>
-            )}
-          </View>
-          <Text 
-            style={[styles.userName, { 
-              color: isDark ? '#FFFFFF' : '#1A202C',
-              maxWidth: '100%',
-              paddingHorizontal: 20,
-              textAlign: 'center'
-            }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {user.name}
-          </Text>
-          <Text 
-            style={[styles.userEmail, { 
-              color: isDark ? '#A0AEC0' : '#718096',
-              maxWidth: '100%',
-              paddingHorizontal: 20,
-              textAlign: 'center'
-            }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {user.email}
-          </Text>
+        {/* Account Section */}
+        <View style={[styles.section, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
+          {renderSectionHeader(accountText)}
+          
           <TouchableOpacity 
-            style={[styles.editButton, { borderColor: colors.primary }]}
+            style={styles.profileContainer}
             onPress={() => navigation.navigate('EditProfile')}
           >
-            <Text style={[styles.editButtonText, { color: colors.primary }]}>
-              {editProfileText || 'Edit Profile'}
-            </Text>
+            <View style={styles.avatarContainer}>
+              {user.avatar ? (
+                <Image source={{ uri: user.avatar }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatarPlaceholder, { backgroundColor: isDark ? '#4A5568' : '#E2E8F0' }]} >
+                  <Text style={[styles.avatarText, { color: isDark ? '#E2E8F0' : '#4A5568' }]} >
+                    {user.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={[styles.profileName, { color: isDark ? '#E2E8F0' : '#1A202C' }]} >
+                {user.name}
+              </Text>
+              <Text style={[styles.profileEmail, { color: isDark ? '#A0AEC0' : '#718096' }]} >
+                {user.email}
+              </Text>
+            </View>
+            <MaterialIcons 
+              name="chevron-right" 
+              size={24} 
+              color={isDark ? '#A0AEC0' : '#718096'} 
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.settingItem, { borderBottomWidth: 0 }]}
+            onPress={() => navigation.navigate('EditProfile')}
+          >
+            <View style={styles.settingLeft}>
+              <MaterialIcons 
+                name="edit" 
+                size={24} 
+                color={isDark ? '#E2E8F0' : '#4A5568'} 
+                style={styles.settingIcon}
+              />
+              <Text style={[styles.settingLabel, { color: isDark ? '#E2E8F0' : '#1A202C' }]} >
+                {editProfileText}
+              </Text>
+            </View>
+            <MaterialIcons 
+              name="chevron-right" 
+              size={24} 
+              color={isDark ? '#A0AEC0' : '#718096'} 
+            />
           </TouchableOpacity>
         </View>
-
-        <View style={[styles.header, { backgroundColor: isDark ? '#1A202C' : '#F7FAFC' }]}>
-          <Text style={[styles.headerTitle, { color: isDark ? '#FFFFFF' : '#1A202C' }]}>
-            {settingsText || 'Settings'}
-          </Text>
-        </View>
-        {/* Account Section */}
-        {renderSectionHeader(accountText)}
-        <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1A202C' : '#FFFFFF' }]}>
-          {renderSettingItem({
-            icon: 'person-outline',
-            label: editProfileText,
-            onPress: () => navigation.navigate('EditProfile'),
-          })}
-          {renderSettingItem({
-            icon: 'notifications-none',
-            label: notificationSettingsText,
-            onPress: () => navigation.navigate('NotificationSettings'),
-          })}
-        </View>
-
+        
         {/* Preferences Section */}
-        {renderSectionHeader(preferencesText)}
-        <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1A202C' : '#FFFFFF' }]}>
+        <View style={[styles.section, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF', marginTop: 16 }]} >
+          {renderSectionHeader(preferencesText)}
+          
           {renderSettingItem({
             icon: 'dark-mode',
             label: darkModeText,
             isSwitch: true,
             switchValue: darkMode,
             onSwitchValueChange: toggleDarkMode,
-            showChevron: false,
-          })}
-          {renderSettingItem({
-            icon: 'notifications-none',
-            label: notificationsText,
-            isSwitch: true,
-            switchValue: notificationsEnabled,
-            onSwitchValueChange: setNotificationsEnabled,
-            showChevron: false,
-          })}
-          {renderSettingItem({
-            icon: 'location-on',
-            label: locationSharingText,
-            isSwitch: true,
-            switchValue: locationSharingEnabled,
-            onSwitchValueChange: setLocationSharingEnabled,
-            showChevron: false,
-          })}
-          {renderSettingItem({
-            icon: 'warning',
-            label: emergencyAlertsText,
-            isSwitch: true,
-            switchValue: emergencyAlertsEnabled,
-            onSwitchValueChange: setEmergencyAlertsEnabled,
-            showChevron: false,
-            isLast: true,
+            isLast: true
           })}
         </View>
-
+        
         {/* Support Section */}
-        {renderSectionHeader(supportText)}
-        <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1A202C' : '#FFFFFF' }]}>
-          {renderSettingItem({
-            icon: 'help-outline',
-            label: helpCenterText,
-            onPress: () => navigation.navigate('HelpCenter'),
-          })}
+        <View style={[styles.section, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF', marginTop: 16 }]} >
+          {renderSectionHeader(supportText)}
+          
           {renderSettingItem({
             icon: 'email',
             label: contactSupportText,
             onPress: () => openEmail('support@caretrek.app'),
-            isLast: true,
           })}
-        </View>
-
-        {/* About Section */}
-        {renderSectionHeader(aboutText)}
-        <View style={[styles.sectionContainer, { backgroundColor: isDark ? '#1A202C' : '#FFFFFF' }]}>
           {renderSettingItem({
             icon: 'privacy-tip',
             label: privacyPolicyText,
@@ -355,14 +302,17 @@ const FamilySettingsScreen = () => {
             icon: 'description',
             label: termsOfServiceText,
             onPress: () => navigation.navigate('TermsOfService'),
+            isLast: true
           })}
-          <View style={styles.versionContainer}>
-            <Text style={[styles.versionText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-              {versionText} 1.0.0
-            </Text>
-          </View>
         </View>
-
+        
+        {/* Version */}
+        <View style={styles.versionContainer} >
+          <Text style={[styles.versionText, { color: isDark ? '#A0AEC0' : '#718096' }]} >
+            {versionText} 1.0.0
+          </Text>
+        </View>
+        
         {/* Sign Out Button */}
         <TouchableOpacity 
           onPress={confirmSignOut}
@@ -373,14 +323,14 @@ const FamilySettingsScreen = () => {
             marginTop: 20,
           }]}
         >
-          <View style={styles.signOutContent}>
+          <View style={styles.signOutContent} >
             <MaterialIcons 
               name="logout" 
               size={24} 
               color="#E53E3E" 
               style={styles.signOutIcon} 
             />
-            <Text style={[styles.signOutText, { color: '#E53E3E' }]}>
+            <Text style={[styles.signOutText, { color: '#E53E3E' }]} >
               {signOutText || 'Sign Out'}
             </Text>
           </View>
@@ -400,50 +350,126 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7FAFC',
   },
-  // Profile Header Styles
-  profileHeader: {
-    padding: 24,
+  section: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    margin: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  profileContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 16,
+  },
+  avatarContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  avatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4A5568',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A202C',
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: '#718096',
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
-  avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(79, 70, 229, 0.1)', // Primary color with 10% opacity
-    justifyContent: 'center',
+  settingLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#4F46E5', // Default primary color
+    flex: 1,
   },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
+  settingIcon: {
+    marginRight: 12,
   },
-  avatarFallback: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  userEmail: {
+  settingLabel: {
     fontSize: 16,
-    marginBottom: 16,
-    textAlign: 'center',
+    color: '#1A202C',
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#718096',
+    marginTop: 24,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    textTransform: 'uppercase',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  versionContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  versionText: {
+    fontSize: 12,
+    color: '#A0AEC0',
+  },
+  signOutButton: {
+    margin: 16,
+    backgroundColor: '#FED7D7',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  signOutIcon: {
+    marginRight: 8,
+    color: '#E53E3E',
+  },
+  signOutContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  signOutText: {
+    color: '#E53E3E',
+    fontWeight: '600',
+    fontSize: 16,
   },
   editButton: {
     paddingVertical: 8,
@@ -451,10 +477,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginTop: 8,
+    borderColor: '#4F46E5',
   },
   editButtonText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#4F46E5',
   },
   header: {
     padding: 16,
@@ -538,6 +566,20 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: '#718096',
+  },
+  signOutButton: {
+    marginTop: 8,
+    marginBottom: 32,
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  signOutText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#E53E3E',
   },
   signOutButton: {
     marginTop: 8,

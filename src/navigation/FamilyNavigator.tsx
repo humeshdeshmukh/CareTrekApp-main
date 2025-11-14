@@ -33,6 +33,8 @@ import MedicationScreen from '../screens/Senior/MedicationScreen';
 import RemindersScreen from '../screens/Senior/RemindersScreen';
 import AppointmentScreen from '../screens/Senior/AppointmentScreen';
 import { SeniorDataProvider } from '../contexts/SeniorDataContext';
+import PrivacyPolicyScreen from '../screens/family/PrivacyPolicyScreen';
+import TermsOfServiceScreen from '../screens/family/TermsOfServiceScreen';
 
 // Senior Management Screens - Removed as per request
 
@@ -56,7 +58,7 @@ type FamilyTabParamList = {
 };
 
 // Type definitions for stack navigation
-type FamilyStackParamList = {
+export type FamilyStackParamList = {
   // Tabs
   MainTabs: undefined;
   
@@ -88,6 +90,8 @@ type FamilyStackParamList = {
   Settings: undefined;
   EditProfile: undefined;
   ChangePassword: undefined;
+  PrivacyPolicy: undefined;
+  TermsOfService: undefined;
 };
 
 const Tab = createBottomTabNavigator<FamilyTabParamList>();
@@ -320,6 +324,22 @@ export const FamilyNavigator = () => {
         options={{
           title: t('Edit Profile') || 'Edit Profile',
           headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="PrivacyPolicy" 
+        component={PrivacyPolicyScreen}
+        options={{ 
+          title: t('Privacy Policy') || 'Privacy Policy',
+          headerShown: true
+        }}
+      />
+      <Stack.Screen 
+        name="TermsOfService" 
+        component={TermsOfServiceScreen}
+        options={{ 
+          title: t('Terms of Service') || 'Terms of Service',
+          headerShown: true
         }}
       />
     </Stack.Navigator>
