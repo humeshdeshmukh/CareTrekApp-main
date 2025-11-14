@@ -277,6 +277,14 @@ export const FamilyNavigator = () => {
       
       {/* Senior Management Screens */}
       <Stack.Screen 
+        name="AddSenior" 
+        component={AddSeniorScreen}
+        options={{ 
+          title: t('Add Senior') || 'Add Senior',
+          headerShown: true
+        }}
+      />
+      <Stack.Screen 
         name="Medication" 
         component={MedicationScreen}
         options={{ title: t('Medication') || 'Medication' }}

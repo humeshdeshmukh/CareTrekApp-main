@@ -227,7 +227,7 @@ const AddSeniorScreen = () => {
         .upsert({
           senior_user_id: senior.id,
           family_user_id: user.id,
-          status: 'active', // Changed from 'accepted' to 'active' to match the database constraint
+          status: 'pending', // Using 'pending' to match the database constraint
           connection_name: relationshipName || 'Family Member',
           senior_name: senior.name,
           senior_email: senior.email,
