@@ -16,14 +16,8 @@
           },
           "android": {
             "enableShrinkResourcesInReleaseBuild": false,
-            "enableProguardInReleaseBuild": false
+            "enableProguardInReleaseBuild": false,
           }
-        }
-      ],
-      [
-        "@react-native-firebase/app",
-        {
-          "disableAutoInit": true
         }
       ],
       "expo-secure-store",

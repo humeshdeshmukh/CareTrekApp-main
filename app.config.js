@@ -2,6 +2,7 @@
 module.exports = {
   expo: {
     name: 'CareTrek',
+    owner: "humeshdeshmukh0",
     slug: 'caretrek',
     version: '1.0.0',
     orientation: 'portrait',
@@ -23,6 +24,9 @@ module.exports = {
         'expo-build-properties',
         {
           ios: {
+            "infoPlist": {
+              "ITSAppUsesNonExemptEncryption": false
+            },
             useFrameworks: 'static'
           },
           android: {
@@ -31,12 +35,6 @@ module.exports = {
           }
         }
       ],
-      [
-        "@react-native-firebase/app",
-        {
-          "disableAutoInit": true
-        }
-      ]
     ],
     extra: {
       // Add your Google Cloud Translation API key here
