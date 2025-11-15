@@ -16,18 +16,12 @@
           },
           "android": {
             "enableShrinkResourcesInReleaseBuild": false,
-            "enableProguardInReleaseBuild": false,
+            "enableProguardInReleaseBuild": false
           }
         }
       ],
       "expo-secure-store",
-      "expo-font",
-      [
-        "expo-barcode-scanner",
-        {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for QR code scanning."
-        }
-      ]
+      "expo-font"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",
