@@ -1,0 +1,3 @@
+cd android
+export GRADLE_OPTS="-Xmx4g"
+./gradlew assembleRelease --no-daemon
