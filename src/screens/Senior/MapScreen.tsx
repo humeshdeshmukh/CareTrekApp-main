@@ -81,19 +81,13 @@ const MapScreen: React.FC = () => {
   const [isSharingLive, setIsSharingLive] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
 
-  // Location + history
+  // Location
   const [currentLocation, setCurrentLocation] = useState<LocationPoint>({
     latitude: DEFAULT_REGION.latitude,
     longitude: DEFAULT_REGION.longitude,
     timestamp: Date.now(),
   });
   const [currentAddress, setCurrentAddress] = useState<string>('');
-  const [locationHistory, setLocationHistory] = useState<LocationPoint[]>([]);
-  const [historyPlaybackIndex, setHistoryPlaybackIndex] = useState<number>(0);
-  const [isPlayingHistory, setIsPlayingHistory] = useState(false);
-
-  // history UI
-  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   // Safezones, favorites, home
   const [safeZones, setSafeZones] = useState<SafeZone[]>([]);
@@ -106,9 +100,6 @@ const MapScreen: React.FC = () => {
   const [homeLocation, setHomeLocation] = useState<LocationPoint | null>(null);
   const [homeAddress, setHomeAddress] = useState<string>('');
 
-  // Search
-  const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Turn-by-turn (in-app)
   const [routeCoords, setRouteCoords] = useState<Array<{ latitude: number; longitude: number }>>([]);
@@ -220,7 +211,6 @@ const MapScreen: React.FC = () => {
 
         console.log('New location:', newLocation);
         setCurrentLocation(newLocation);
-        setLocationHistory((prev) => [...prev.slice(-199), newLocation]);
         checkSafeZones(newLocation);
 
         // Center map on current location
@@ -273,7 +263,6 @@ const MapScreen: React.FC = () => {
           timestamp: Date.now(),
         };
         setCurrentLocation(newLocation);
-        setLocationHistory((prev) => [...prev.slice(-199), newLocation]);
         checkSafeZones(newLocation);
       }
     ).then(sub => {
@@ -326,10 +315,9 @@ const MapScreen: React.FC = () => {
     };
   }, []);
 
-  // persist favorites/safezones/history/home when changed
+  // persist favorites/safezones/home when changed
   useEffect(() => { AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(favorites)).catch(() => {}); }, [favorites]);
   useEffect(() => { AsyncStorage.setItem(STORAGE_KEYS.SAFE_ZONES, JSON.stringify(safeZones)).catch(() => {}); }, [safeZones]);
-  useEffect(() => { AsyncStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(locationHistory)).catch(() => {}); }, [locationHistory]);
   useEffect(() => { AsyncStorage.setItem(STORAGE_KEYS.HOME, JSON.stringify(homeLocation)).catch(() => {}); }, [homeLocation]);
 
   // update address when currentLocation changes
@@ -352,11 +340,9 @@ const MapScreen: React.FC = () => {
     try {
       const favRaw = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
       const szRaw = await AsyncStorage.getItem(STORAGE_KEYS.SAFE_ZONES);
-      const histRaw = await AsyncStorage.getItem(STORAGE_KEYS.HISTORY);
       const homeRaw = await AsyncStorage.getItem(STORAGE_KEYS.HOME);
       if (favRaw) setFavorites(JSON.parse(favRaw));
       if (szRaw) setSafeZones(JSON.parse(szRaw));
-      if (histRaw) setLocationHistory(JSON.parse(histRaw));
       if (homeRaw) {
         const h = JSON.parse(homeRaw);
         setHomeLocation(h);
@@ -364,17 +350,6 @@ const MapScreen: React.FC = () => {
       }
     } catch (e) {
       console.warn('Load persisted failed', e);
-    }
-
-    // if no history, seed demo
-    if (!locationHistory || locationHistory.length === 0) {
-      const demoHistory: LocationPoint[] = [
-        { latitude: 37.78825, longitude: -122.4324, timestamp: Date.now() - 1800_000 },
-        { latitude: 37.78925, longitude: -122.4334, timestamp: Date.now() - 1200_000 },
-        { latitude: 37.79025, longitude: -122.4344, timestamp: Date.now() - 600_000 },
-        { latitude: 37.79125, longitude: -122.4354, timestamp: Date.now() },
-      ];
-      setLocationHistory(demoHistory);
     }
   };
 
@@ -614,23 +589,6 @@ const MapScreen: React.FC = () => {
     }
   };
 
-  // ---------- history controls ----------
-  const togglePlayPause = () => { setIsPlayingHistory((p) => { const next = !p; if (next && locationHistory.length > 0) setHistoryExpanded(true); return next; }); };
-  const clearHistory = () => { Alert.alert('Confirm', 'Clear location history?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clear', style: 'destructive', onPress: () => { setLocationHistory([]); setHistoryPlaybackIndex(0); } }, ]); };
-
-  // ---------- Search ----------
-  const openSearch = () => setSearchModalVisible(true);
-  const closeSearch = () => setSearchModalVisible(false);
-  const performSearchAndCenter = async () => {
-    const q = searchQuery.trim();
-    if (!q) return;
-    const parts = q.split(',').map((s) => s.trim());
-    if (parts.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
-      const lat = Number(parts[0]); const lng = Number(parts[1]); mapRef.current?.animateToRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 350); closeSearch(); return;
-    }
-    Alert.alert('Search', 'Please enter coordinates as `lat,lng` or ask me to wire a geocoding provider.');
-  };
-
   // ---------- Render ----------
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#0F1724' : '#FFFBEF' }]}>
@@ -640,27 +598,22 @@ const MapScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={20} color={isDark ? '#E2E8F0' : '#1A202C'} />
           <Text style={[styles.headerTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>{myLocationText}</Text>
         </TouchableOpacity>
-
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => setFavoritesModalVisible(true)} style={styles.iconButton} accessibilityLabel="Open favorites">
             <Ionicons name="star" size={20} color={isDark ? '#E2E8F0' : '#1A202C'} />
           </TouchableOpacity>
-
           <TouchableOpacity onPress={() => setMapType((t) => (t === 'standard' ? 'satellite' : t === 'satellite' ? 'hybrid' : 'standard'))} style={styles.iconButton}>
             <Ionicons name="layers" size={20} color={isDark ? '#E2E8F0' : '#1A202C'} />
           </TouchableOpacity>
-
           <TouchableOpacity onPress={() => setShowTraffic((s) => !s)} style={styles.iconButton}>
             <Ionicons name="speedometer" size={20} color={showTraffic ? '#EF4444' : (isDark ? '#E2E8F0' : '#1A202C')} />
           </TouchableOpacity>
-
           <TouchableOpacity onPress={openShareModal} style={[styles.shareButton, { backgroundColor: isDark ? '#1F2937' : '#2F855A' }]}>
             <Ionicons name="share-social" size={18} color="white" />
             <Text style={styles.shareButtonText}>{shareText}</Text>
           </TouchableOpacity>
         </View>
       </View>
-
       {/* Map */}
       <View style={styles.mapContainer}>
         <MapView
@@ -675,104 +628,64 @@ const MapScreen: React.FC = () => {
           showsTraffic={showTraffic}
         >
           <Marker coordinate={{ latitude: currentLocation.latitude, longitude: currentLocation.longitude }} title="You" description={currentAddress || new Date(currentLocation.timestamp).toLocaleString()} />
-
           {homeLocation && (
             <Marker coordinate={{ latitude: homeLocation.latitude, longitude: homeLocation.longitude }} title="Home" description={homeAddress} pinColor="green">
             </Marker>
           )}
-
-          {locationHistory.map((p, i) => (<Marker key={`hist-${i}`} coordinate={{ latitude: p.latitude, longitude: p.longitude }} opacity={0.5} />))}
           {safeZones.map((z) => (<Circle key={z.id} center={{ latitude: z.latitude, longitude: z.longitude }} radius={z.radius} strokeColor="rgba(34,139,34,0.6)" fillColor="rgba(34,139,34,0.15)" />))}
           {favorites.map((f, idx) => (<Marker key={`fav-${idx}`} coordinate={{ latitude: f.latitude, longitude: f.longitude }} pinColor="purple" />))}
           {tempZoneCoords && <Marker coordinate={tempZoneCoords} pinColor="orange" />}
-
           {/* route polyline */}
           {routeCoords && routeCoords.length > 0 && (
             <Polyline coordinates={routeCoords} strokeWidth={4} lineDashPattern={[1]} />
           )}
         </MapView>
       </View>
-
-      {/* Footer (bottom panel) - search icon added, favorites removed from footer */}
+      {/* Footer (bottom panel) */}
       <View style={[styles.footer, { backgroundColor: isDark ? '#0B1220' : '#FFFFFF' }]}>
         <View style={styles.locationInfo}>
           <Ionicons name="location" size={20} color={isDark ? '#63B3ED' : '#3182CE'} style={styles.locationIcon} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.addressTitle, { color: isDark ? '#E2E8F0' : '#1A202C' }]}>Current Location</Text>
-            <Text style={[styles.address, { color: isDark ? '#9AA6B2' : '#4A5568' }]}>{currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}</Text>
-            <Text style={[styles.smallText, { color: isDark ? '#9AA6B2' : '#718096' }]} numberOfLines={2}>{currentAddress || 'Address: —'}</Text>
+            <Text style={[styles.address, { color: isDark ? '#9CA3AF' : '#4A5568' }]}>{currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}</Text>
+            <Text style={[styles.smallText, { color: isDark ? '#9CA3AF' : '#718096' }]} numberOfLines={2}>{currentAddress || 'Address: —'}</Text>
           </View>
         </View>
-
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity style={styles.footerButton} onPress={() => mapRef.current?.animateToRegion({ latitude: currentLocation.latitude, longitude: currentLocation.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 350)}><Ionicons name="locate" size={20} color="white" /></TouchableOpacity>
-
-          {/* Search button (new) */}
-          <TouchableOpacity style={[styles.footerButton, { backgroundColor: '#2563EB' }]} onPress={() => setSearchModalVisible(true)}><Ionicons name="search" size={20} color="white" /></TouchableOpacity>
-
-          <TouchableOpacity style={[styles.footerButton, { backgroundColor: '#2F855A' }]} onPress={saveHome}><Ionicons name="home" size={20} color="white" /></TouchableOpacity>
+          <TouchableOpacity style={styles.footerButton} onPress={() => mapRef.current?.animateToRegion({ latitude: currentLocation.latitude, longitude: currentLocation.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 350)}>
+            <Ionicons name="locate" size={20} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.footerButton, { backgroundColor: '#2F855A' }]} onPress={saveHome}>
+            <Ionicons name="home" size={20} color="white" />
+          </TouchableOpacity>
         </View>
       </View>
-
       {/* SOS Floating Button (right) */}
       <TouchableOpacity style={styles.sosButton} onPress={triggerSOS} activeOpacity={0.8}><Ionicons name="warning" size={28} color="white" /><Text style={styles.sosText}>{sosText ?? 'SOS'}</Text></TouchableOpacity>
-
-      {/* Vertical history controls (right, above SOS) */}
-      {!historyExpanded ? (
-        <View style={[styles.verticalHistoryRight, { backgroundColor: isDark ? '#071127' : '#FFFFFF' }]}>
-          <TouchableOpacity style={styles.iconSquare} onPress={togglePlayPause} accessibilityLabel="PlayPause history"><Ionicons name={isPlayingHistory ? 'pause' : 'play'} size={18} color="white" /></TouchableOpacity>
-          <TouchableOpacity style={[styles.iconSquare, { marginTop: 8 }]} onPress={clearHistory} accessibilityLabel="Clear history"><Ionicons name="trash" size={16} color="white" /></TouchableOpacity>
-          <TouchableOpacity style={[styles.iconSquare, { marginTop: 8 }]} onPress={() => setHistoryExpanded(true)} accessibilityLabel="Expand history"><Ionicons name="chevron-up" size={18} color="white" /></TouchableOpacity>
-        </View>
-      ) : (
-        <View style={[styles.historyPanelExpanded, { backgroundColor: isDark ? '#071127' : '#FFFFFF' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <Text style={{ color: isDark ? '#E2E8F0' : '#111', fontWeight: '600' }}>Location History</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity style={styles.smallAction} onPress={() => setHistoryExpanded(false)}><Ionicons name="chevron-down" size={18} color={isDark ? '#E2E8F0' : '#111'} /></TouchableOpacity>
-            </View>
-          </View>
-
-          <Slider style={{ width: Math.max(180, width - 220) }} minimumValue={0} maximumValue={Math.max(locationHistory.length - 1, 0)} step={1} value={Math.min(historyPlaybackIndex, Math.max(locationHistory.length - 1, 0))} minimumTrackTintColor="#2563EB" onValueChange={(v: number) => { const vi = Math.round(v); setHistoryPlaybackIndex(vi); const p = locationHistory[vi]; if (p) { mapRef.current?.animateToRegion({ latitude: p.latitude, longitude: p.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 300); } }} disabled={locationHistory.length === 0} />
-
-          <View style={{ flexDirection: 'row', marginTop: 8 }}>
-            <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}><Ionicons name={isPlayingHistory ? 'pause' : 'play'} size={18} color="white" /></TouchableOpacity>
-            <TouchableOpacity style={[styles.playButton, { marginLeft: 8 }]} onPress={clearHistory}><Ionicons name="trash" size={18} color="white" /></TouchableOpacity>
-          </View>
-        </View>
-      )}
-
       {/* Share Modal (simplified - one-shot share) */}
       <Modal visible={shareModalVisible} transparent animationType="slide" onRequestClose={closeShareModal}>
         <View style={styles.modalOverlay}><View style={[styles.modalContent, { backgroundColor: isDark ? '#0B1220' : '#FFF' }]}>
           <Text style={[styles.modalTitle, { color: isDark ? '#E2E8F0' : '#111' }]}>Share location</Text>
-
           <Text style={{ marginBottom: 12 }}>Share your current precise location (full address + coordinates + open links).</Text>
-
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <TouchableOpacity style={styles.modalButtonCancel} onPress={closeShareModal}><Text>Cancel</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalButtonPrimary} onPress={startLiveShare}><Text style={{ color: 'white' }}>Share</Text></TouchableOpacity>
           </View>
         </View></View>
       </Modal>
-
       {/* Add Safe Zone Modal */}
       <Modal visible={newZoneModalVisible} transparent animationType="slide" onRequestClose={() => setNewZoneModalVisible(false)}>
         <View style={styles.modalOverlay}><View style={[styles.modalContent, { backgroundColor: isDark ? '#0B1220' : '#FFF' }]}>
           <Text style={[styles.modalTitle, { color: isDark ? '#E2E8F0' : '#111' }]}>Add Safe Zone</Text>
-
           <TextInput placeholder="Zone name" value={newZoneTitle} onChangeText={setNewZoneTitle} style={[styles.input, { backgroundColor: isDark ? '#111827' : '#F7FAFC', color: isDark ? '#E2E8F0' : '#111' }]} placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'} />
-
           <Text style={{ marginBottom: 8 }}>{`Radius (meters): ${newZoneRadius}`}</Text>
           <Slider minimumValue={50} maximumValue={1000} step={10} value={newZoneRadius} onValueChange={(v) => setNewZoneRadius(Math.round(v))} />
-
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
             <TouchableOpacity style={styles.modalButtonCancel} onPress={() => { setNewZoneModalVisible(false); setTempZoneCoords(null); }}><Text>Cancel</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalButtonPrimary} onPress={confirmAddSafeZone}><Text style={{ color: 'white' }}>Add Zone</Text></TouchableOpacity>
           </View>
         </View></View>
       </Modal>
-
       {/* Favorites Modal (moved from footer) */}
       <Modal visible={favoritesModalVisible} transparent animationType="slide" onRequestClose={() => setFavoritesModalVisible(false)}>
         <View style={styles.modalOverlay}><View style={[styles.modalContent, { backgroundColor: isDark ? '#0B1220' : '#FFF', maxHeight: 400 }]}>
@@ -786,33 +699,15 @@ const MapScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
           ))) }
-
           <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
             <TouchableOpacity style={styles.modalButtonCancel} onPress={() => setFavoritesModalVisible(false)}><Text>Close</Text></TouchableOpacity>
           </View>
-
         </View></View>
       </Modal>
-
-      {/* Search Modal (simple) */}
-      <Modal visible={searchModalVisible} transparent animationType="slide" onRequestClose={closeSearch}>
-        <View style={styles.modalOverlay}><View style={[styles.modalContent, { backgroundColor: isDark ? '#0B1220' : '#FFF' }]}>
-          <Text style={[styles.modalTitle, { color: isDark ? '#E2E8F0' : '#111' }]}>Search place</Text>
-          <TextInput placeholder="Enter place or address (or lat,lng)" value={searchQuery} onChangeText={setSearchQuery} style={[styles.input, { backgroundColor: isDark ? '#111827' : '#F7FAFC', color: isDark ? '#E2E8F0' : '#111' }]} placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'} />
-
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <TouchableOpacity style={styles.modalButtonCancel} onPress={closeSearch}><Text>Cancel</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.modalButtonPrimary} onPress={performSearchAndCenter}><Text style={{ color: 'white' }}>Go</Text></TouchableOpacity>
-          </View>
-        </View></View>
-      </Modal>
-
     </SafeAreaView>
   );
 };
-
 export default MapScreen;
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -909,61 +804,13 @@ const styles = StyleSheet.create({
     minWidth: 120,
     alignItems: 'center',
   },
-  input: { padding: 10, borderRadius: 8, marginVertical: 8 },
-  verticalHistoryRight: {
-    position: 'absolute',
-    right: 16,
-    bottom: 186,
-    width: 56,
-    padding: 8,
-    borderRadius: 12,
-    elevation: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconSquare: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: '#2563EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  historyPanelExpanded: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 76,
-    padding: 10,
-    borderRadius: 12,
-    elevation: 6,
-    alignItems: 'center',
-  },
-  smallAction: {
-    padding: 6,
-    marginLeft: 8,
-  },
-  playButton: {
-    backgroundColor: '#2563EB',
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  historyContainer: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 12,
-    padding: 10,
-    borderRadius: 12,
-    elevation: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  input: { 
+    padding: 10, 
+    borderRadius: 8, 
+    marginVertical: 8,
+    backgroundColor: '#FFFFFF',
+    color: '#000000'
+  }
 });
 
 // Notes for maintainers:
