@@ -30,6 +30,7 @@ import SeniorDetailScreen from '../screens/family/SeniorDetailScreen';
 import AlertsScreen from '../screens/family/AlertsScreen';
 import FamilySettingsScreen from '../screens/family/FamilySettingsScreen';
 import SeniorsListScreen from '../screens/family/SeniorsListScreen';
+import HomeLocationScreen from '../screens/Senior/HomeLocationScreen';
 
 // Import navigators
 import FamilyNavigator from './FamilyNavigator';
@@ -77,6 +78,7 @@ export type RootStackParamList = {
   Messages: { recipientId: string };
   TrackSenior: { seniorId: string };
   AddSenior: undefined;
+  HomeLocationScreen: undefined;
   ScanQRCode: undefined;
   AddFamilyMember: undefined;
   ConnectSenior: undefined;
@@ -98,6 +100,7 @@ export type RootStackParamList = {
   IdShareScreen: undefined;
   Appointments: undefined;
   Map: undefined;
+  HomeLocation: undefined;
 };
 
 // Import AuthStackParamList from types
@@ -203,8 +206,13 @@ const RootNavigator = () => {
           name="Map"
           component={MapScreen}
           options={{
-            headerShown: false
+            headerShown: false,
           }}
+        />
+        <Stack.Screen
+          name="HomeLocation"
+          component={HomeLocationScreen}
+          options={{ title: 'Set Home Location' }}
         />
 
         {/* IdShare Screen */}

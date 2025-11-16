@@ -27,10 +27,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from '../../contexts/translation/TranslationContext';
 import { useCachedTranslation } from '../../hooks/useCachedTranslation';
 import Slider from '@react-native-community/slider';
+import { useAuth } from '../../hooks/useAuth';
+import { homeLocationService } from '../../services/homeLocationService';
+import * as TaskManager from 'expo-task-manager';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as Notifications from 'expo-notifications';
+// Remove duplicate Linking import
 
 const { width, height } = Dimensions.get('window');
 
-type MapScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Map'>;
+type MapScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Map' | 'HomeLocation'>;
 
 type LocationPoint = {
   latitude: number;
@@ -68,7 +74,6 @@ const MapScreen: React.FC = () => {
   const { translatedText: myLocationText } = useCachedTranslation('My Location', currentLanguage);
   const { translatedText: shareText } = useCachedTranslation('Share', currentLanguage);
   const { translatedText: backText } = useCachedTranslation('Back', currentLanguage);
-  const { translatedText: sosText } = useCachedTranslation('SOS', currentLanguage);
 
   const mapRef = useRef<MapView>(null);
 
@@ -80,8 +85,10 @@ const MapScreen: React.FC = () => {
   // Sharing (simplified: one-shot share)
   const [isSharingLive, setIsSharingLive] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [sosText, setSosText] = useState('');
 
   // Location
+  const [hasLocationPermission, setHasLocationPermission] = useState<boolean>(false);
   const [currentLocation, setCurrentLocation] = useState<LocationPoint>({
     latitude: DEFAULT_REGION.latitude,
     longitude: DEFAULT_REGION.longitude,
@@ -97,45 +104,26 @@ const MapScreen: React.FC = () => {
   const [newZoneRadius, setNewZoneRadius] = useState<number>(100);
   const [favorites, setFavorites] = useState<LocationPoint[]>([]);
   const [favoritesModalVisible, setFavoritesModalVisible] = useState(false);
-  const [homeLocation, setHomeLocation] = useState<LocationPoint | null>(null);
+  const [homeLocation, setHomeLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [homeAddress, setHomeAddress] = useState<string>('');
 
 
-  // Turn-by-turn (in-app)
+  // Turn-by-turn navigation state
   const [routeCoords, setRouteCoords] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const [routeSteps, setRouteSteps] = useState<Array<{ instruction: string; lat: number; lng: number }>>([]);
+  const [isNavigating, setIsNavigating] = useState(false);
   const navAnimRef = useRef<number | null>(null);
   const navIndexRef = useRef<number>(0);
+  const { user } = useAuth();
 
   // Request location permission for both Android and iOS
-  const requestLocationPermission = async () => {
+  const requestLocationPermission = useCallback(async () => {
     try {
-      console.log('Requesting location permission...');
       const { status } = await Location.requestForegroundPermissionsAsync();
-      console.log('Location permission status:', status);
+      const granted = status === 'granted';
+      setHasLocationPermission(granted);
       
-      if (status === 'granted') {
-        console.log('Location permission granted');
-        // Check if location is enabled
-        const enabled = await Location.hasServicesEnabledAsync();
-        if (!enabled) {
-          console.log('Location services are disabled');
-          Alert.alert(
-            'Location Services Disabled',
-            'Please enable location services on your device to use this feature.',
-            [
-              {
-                text: 'Open Settings',
-                onPress: () => Linking.openSettings()
-              },
-              { text: 'Cancel', style: 'cancel' }
-            ]
-          );
-          return false;
-        }
-        return true;
-      } else {
-        console.log('Location permission denied');
+      if (!granted) {
         Alert.alert(
           'Permission Required',
           'Location permission is needed to show your position on the map. Please enable it in your device settings.',
@@ -147,14 +135,14 @@ const MapScreen: React.FC = () => {
             { text: 'Cancel', style: 'cancel' }
           ]
         );
-        return false;
       }
-    } catch (err) {
-      console.error('Error requesting location permission:', err);
+      return granted;
+    } catch (error) {
+      console.error('Error requesting location permission:', error);
       Alert.alert('Error', 'Failed to request location permission. Please try again.');
       return false;
     }
-  };
+  }, []);
 
   // Get current location
   const getCurrentLocation = async () => {
@@ -303,7 +291,23 @@ const MapScreen: React.FC = () => {
     }
   };
 
-  // ---------- lifecycle ----------
+  // Load home location on mount
+  useEffect(() => {
+    const loadHomeLocation = async () => {
+      if (user?.id) {
+        const location = await homeLocationService.getHomeLocation(user.id);
+        if (location) {
+          setHomeLocation({
+            latitude: location.latitude,
+            longitude: location.longitude
+          });
+        }
+      }
+    };
+    loadHomeLocation();
+  }, [user?.id]);
+
+  // Initialize location tracking and other effects
   useEffect(() => {
     (async () => {
       await loadPersistedData();
@@ -334,6 +338,26 @@ const MapScreen: React.FC = () => {
     fetch();
     return () => { mounted = false; };
   }, [currentLocation]);
+
+  // Handle region change
+  const handleRegionChange = (region: Region) => {
+    setRegion(region);
+  };
+
+  // Render map markers
+  const renderMapMarkers = () => {
+    return (
+      <>
+        {homeLocation && (
+          <Marker
+            coordinate={homeLocation}
+            title="Home"
+            pinColor="#4CAF50"
+          />
+        )}
+      </>
+    );
+  };
 
   // ---------- helpers ----------
   const loadPersistedData = async () => {
@@ -566,28 +590,128 @@ const MapScreen: React.FC = () => {
     }, 700) as unknown as number;
   };
 
-  const stopNavAnimation = () => { if (navAnimRef.current) { clearInterval(navAnimRef.current as any); navAnimRef.current = null; navIndexRef.current = 0; } };
+  const stopNavAnimation = () => { 
+    if (navAnimRef.current) { 
+      clearInterval(navAnimRef.current as any); 
+      navAnimRef.current = null; 
+      navIndexRef.current = 0; 
+    } 
+  };
 
-  const startNavigationTo = async (lat: number, lng: number) => { // in-app route fetching (OSRM)
+  // Navigation functions
+  const startNavigation = useCallback((destination: { latitude: number; longitude: number }) => {
+    if (!currentLocation) return;
+    
+    // Simple straight-line navigation for demo
+    const newRoute = [
+      { latitude: currentLocation.latitude, longitude: currentLocation.longitude },
+      destination
+    ];
+    
+    setRouteCoords(newRoute);
+    setRouteSteps([
+      { instruction: 'Head to destination', lat: destination.latitude, lng: destination.longitude }
+    ]);
+    setIsNavigating(true);
+    
+    // Center map on route
+    mapRef.current?.fitToCoordinates(newRoute, {
+      edgePadding: { top: 100, right: 50, bottom: 200, left: 50 },
+      animated: true,
+    });
+  }, [currentLocation]);
+
+  const startNavigationTo = useCallback(async (lat: number, lng: number) => {
+    if (!currentLocation) return;
+    
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${currentLocation.longitude},${currentLocation.latitude};${lng},${lat}?overview=full&geometries=geojson`;
       const res = await fetch(url);
       const json = await res.json();
+      
       if (json.routes && json.routes.length) {
-        const coords = json.routes[0].geometry.coordinates.map((c: any) => ({ latitude: c[1], longitude: c[0] }));
+        const coords = json.routes[0].geometry.coordinates.map((c: any) => ({ 
+          latitude: c[1], 
+          longitude: c[0] 
+        }));
+        
         setRouteCoords(coords);
+        
         const steps: Array<{ instruction: string; lat: number; lng: number }> = [];
-        (json.routes[0].legs || []).forEach((leg: any) => { (leg.steps || []).forEach((s: any) => { steps.push({ instruction: s.maneuver && s.maneuver.instruction ? s.maneuver.instruction : 'Proceed', lat: s.maneuver.location[1], lng: s.maneuver.location[0] }); }); });
+        (json.routes[0].legs || []).forEach((leg: any) => { 
+          (leg.steps || []).forEach((s: any) => { 
+            steps.push({ 
+              instruction: s.maneuver?.instruction || 'Proceed', 
+              lat: s.maneuver?.location?.[1] || lat, 
+              lng: s.maneuver?.location?.[0] || lng 
+            }); 
+          }); 
+        });
+        
         setRouteSteps(steps);
-        startRouteAnimation(coords, steps);
+        setIsNavigating(true);
+        
+        // Center map on route
+        if (coords.length > 0) {
+          mapRef.current?.fitToCoordinates(coords, {
+            edgePadding: { top: 100, right: 50, bottom: 200, left: 50 },
+            animated: true,
+          });
+        }
       } else {
-        startStraightLineNav(lat, lng);
+        // Fallback to straight line navigation
+        startNavigation({ latitude: lat, longitude: lng });
       }
     } catch (e) {
-      console.warn('OSRM failed', e);
-      startStraightLineNav(lat, lng);
+      console.warn('OSRM routing failed, falling back to straight line navigation', e);
+      // Fallback to straight line navigation
+      startNavigation({ latitude: lat, longitude: lng });
     }
-  };
+  }, [currentLocation, startNavigation]);
+
+  const stopNavigation = useCallback(() => {
+    setIsNavigating(false);
+    setRouteCoords([]);
+    setRouteSteps([]);
+    // Reset map to show current location
+    if (currentLocation) {
+      mapRef.current?.animateToRegion({
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    }
+  }, [currentLocation]);
+
+  const navigateToHome = useCallback(() => {
+    if (homeLocation) {
+      startNavigation(homeLocation);
+    } else {
+      // @ts-ignore - HomeLocation is a valid route
+      navigation.navigate('HomeLocation');
+    }
+  }, [homeLocation, navigation, startNavigation]);
+
+  // Center on user location
+  const centerOnUserLocation = useCallback(async () => {
+    if (hasLocationPermission) {
+      const location = await Location.getCurrentPositionAsync({});
+
+      const { latitude, longitude } = location.coords;
+      mapRef.current?.animateToRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    }
+  }, [hasLocationPermission]);
+
+  // Navigate to home location screen
+  const navigateToHomeLocation = useCallback(() => {
+    navigation.navigate('HomeLocation');
+  }, [navigation]);
 
   // ---------- Render ----------
   return (
@@ -619,19 +743,15 @@ const MapScreen: React.FC = () => {
         <MapView
           ref={mapRef}
           style={styles.map}
-          initialRegion={DEFAULT_REGION}
+          initialRegion={region}
           showsUserLocation
-          showsMyLocationButton
-          followsUserLocation
-          onLongPress={(e) => { setTempZoneCoords(e.nativeEvent.coordinate); setNewZoneModalVisible(true); }}
+          showsMyLocationButton={false}
           mapType={mapType}
           showsTraffic={showTraffic}
+          onRegionChangeComplete={handleRegionChange}
         >
-          <Marker coordinate={{ latitude: currentLocation.latitude, longitude: currentLocation.longitude }} title="You" description={currentAddress || new Date(currentLocation.timestamp).toLocaleString()} />
-          {homeLocation && (
-            <Marker coordinate={{ latitude: homeLocation.latitude, longitude: homeLocation.longitude }} title="Home" description={homeAddress} pinColor="green">
-            </Marker>
-          )}
+          {/* Map markers and overlays */}
+          {renderMapMarkers()}
           {safeZones.map((z) => (<Circle key={z.id} center={{ latitude: z.latitude, longitude: z.longitude }} radius={z.radius} strokeColor="rgba(34,139,34,0.6)" fillColor="rgba(34,139,34,0.15)" />))}
           {favorites.map((f, idx) => (<Marker key={`fav-${idx}`} coordinate={{ latitude: f.latitude, longitude: f.longitude }} pinColor="purple" />))}
           {tempZoneCoords && <Marker coordinate={tempZoneCoords} pinColor="orange" />}
@@ -660,8 +780,36 @@ const MapScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
-      {/* SOS Floating Button (right) */}
-      <TouchableOpacity style={styles.sosButton} onPress={triggerSOS} activeOpacity={0.8}><Ionicons name="warning" size={28} color="white" /><Text style={styles.sosText}>{sosText ?? 'SOS'}</Text></TouchableOpacity>
+      {/* Home Navigation Button */}
+      <TouchableOpacity
+        style={[styles.navButton, isDark && styles.navButtonDark, { bottom: 120 }]}
+        onPress={navigateToHome}
+      >
+        <Ionicons name="home" size={24} color={isDark ? '#fff' : '#000'} />
+      </TouchableOpacity>
+
+      {/* SOS Button */}
+      <TouchableOpacity
+        style={[styles.sosButton, isDark && styles.sosButtonDark]}
+        onPress={triggerSOS}
+      >
+        <Text style={styles.sosButtonText}>{sosText ?? 'SOS'}</Text>
+      </TouchableOpacity>
+
+      {/* Navigation Controls */}
+      {isNavigating && (
+        <View style={[styles.navigationControls, isDark && styles.navigationControlsDark]}>
+          <Text style={[styles.navInstruction, isDark && styles.darkText]}>
+            {routeSteps[0]?.instruction || 'Navigating...'}
+          </Text>
+          <TouchableOpacity 
+            style={styles.stopNavButton}
+            onPress={stopNavigation}
+          >
+            <Text style={styles.stopNavText}>Stop Navigation</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {/* Share Modal (simplified - one-shot share) */}
       <Modal visible={shareModalVisible} transparent animationType="slide" onRequestClose={closeShareModal}>
         <View style={styles.modalOverlay}><View style={[styles.modalContent, { backgroundColor: isDark ? '#0B1220' : '#FFF' }]}>
@@ -709,7 +857,55 @@ const MapScreen: React.FC = () => {
 };
 export default MapScreen;
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+    position: 'relative',
+  },
+  floatingButtons: {
+    position: 'absolute',
+    right: 16,
+    bottom: 100,
+    alignItems: 'center',
+  },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 8,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  locationButton: {
+    backgroundColor: '#fff',
+  },
+  homeButton: {
+    backgroundColor: '#fff',
+  },
+  navigationButton: {
+    backgroundColor: '#fff',
+  },
+  stopButton: {
+    backgroundColor: '#ff3b30',
+  },
+  sosButton: {
+    backgroundColor: '#ff3b30',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  darkButton: {
+    backgroundColor: '#333',
+  },
+  sosText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   header: {
     padding: 12,
     flexDirection: 'row',
@@ -746,18 +942,31 @@ const styles = StyleSheet.create({
   smallText: { fontSize: 11 },
   footerButton: {
     width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#2563EB',
-    marginLeft: 8,
+    borderRadius: 12,
+  },
+  navButton: {
+    position: 'absolute',
+    right: 20,
+    backgroundColor: '#f0f0f0',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  navButtonDark: {
+    backgroundColor: '#333',
   },
   sosButton: {
     position: 'absolute',
-    right: 16,
-    bottom: 110,
-    backgroundColor: '#EF4444',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#ff3b30',
     width: 68,
     height: 68,
     borderRadius: 34,
@@ -765,30 +974,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 8,
   },
-  sosText: { color: 'white', fontWeight: '700', marginTop: 4, fontSize: 12 },
+  sosButtonDark: {
+    backgroundColor: '#cc2e24',
+  },
+  sosButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  navigationControls: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    elevation: 5,
+  },
+  navigationControlsDark: {
+    backgroundColor: '#333',
+  },
+  navInstruction: {
+    flex: 1,
+    marginRight: 10,
+    color: '#333',
+  },
+  darkText: {
+    color: '#fff',
+  },
+  stopNavButton: {
+    backgroundColor: '#ff3b30',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+  },
+  stopNavText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
-    width: width - 40,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  durationOption: {
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 6,
-    backgroundColor: '#F1F5F9',
-  },
-  durationSelected: {
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 6,
-    backgroundColor: '#D1FAE5',
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
   },
   modalButtonPrimary: {
     padding: 12,
