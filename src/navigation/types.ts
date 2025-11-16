@@ -84,6 +84,7 @@ export type SeniorStackParamList = {
   Medication: undefined;
   Appointments: undefined;
   Chat: undefined;
+  HomeLocation: undefined;
 };
 
 // Re-export RootStackParamList from RootNavigator to avoid duplication
